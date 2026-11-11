@@ -57,6 +57,7 @@ async function upload(){
 function edit(state,importing=false,confirmLocal=false){
   if(!uid || !baseline) return false;
   const owner=uid;
+  if(importing && state.field===undefined)state={...state,field:baseline.field};
   const delta=clone(changes(baseline,state));
   // An explicitly imported save may bring previously unseen quests; it never deletes another device's research.
   baseline=clone(state);revision++;
@@ -86,17 +87,10 @@ async function account(user) {
   try{
     await writes;
     if(generation!==epoch)return;
-    const previous=uid;
     uid=user?.uid||null;baseline=null;
     hooks.closeAccount();
     if(!uid){hooks.guest();return;}
     const owner=uid;
-    const guest=previous?null:hooks.readGuest();
-    if(guest && labSave.valid(guest)) {
-      await update(owner,changes(emptyLab(),guest,true),'local',actor,true);
-      if(generation!==epoch)return;
-      hooks.claimGuest(guest);
-    }
     await refresh(owner);
     if(generation!==epoch)return;
     stop=listen(owner,delta=>{
@@ -125,5 +119,16 @@ window.pixelAccount={
     navigator.serviceWorker?.addEventListener('message',e=>{if(e.data==='pixel-lab-sent')wake();});
   },
   edit, get uid(){return uid;}, get email(){return auth.currentUser?.email;}, get status(){return message();},
-  login, async logout(){await writes;await signOut(auth);}, retry:upload
+  async login(includeGuest=false){
+    const guest=includeGuest?hooks.readGuest():null;
+    const {user}=await login();
+    if(!guest || !labSave.valid(guest) || auth.currentUser?.uid!==user.uid)return;
+    // Bind the opt-in to the account actually chosen in this popup, including across tabs.
+    await queue(async()=>{
+      await update(user.uid,changes(emptyLab(),guest,true),'local',actor,true);
+      hooks.claimGuest(guest);
+      channel?.postMessage(user.uid);
+      if(uid===user.uid){await refresh(uid);requestBackground();soon(0);}
+    });
+  }, async logout(){await writes;await signOut(auth);}, retry:upload
 };

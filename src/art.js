@@ -1,16 +1,16 @@
-const palette={K:'#263d39',G:'#517960',g:'#87a46e',L:'#c9d288',Y:'#f3c579',O:'#ce8652',R:'#aa5845',r:'#e88865',B:'#5f8192',b:'#a5c2bd',W:'#eee4b8',D:'#514c48',T:'#ae855b',t:'#dca56e',P:'#9b8295'};
-const icons={
- plant:['      g   G     ','    Ggg  GgG    ','   GgLg GggG    ','    GgG GgG     ','      G G       ','      Gg        ','   KRRRRRRRK    ','   RrrrrrrrR    ','    RrOOOrR     ','    RrOOOrR     ','     RRRRR      '],
- lens:['    KKK    KKK  ','   KbbWK  KbbWK ','   KbWWK  KbWWK ','   KbbbKKKKbbBK ','    KBK OO KBK  ','     KKrOOrKK   ','      OYYYOO    ','     OOrRrrOO   ','     DDDDDDDD   '],
- crab:['  rR       Rr   ',' Rr r     r rR  ',' RrrR K K RrrR  ','   R rRrRr R    ','  rRRrrrrrRRr   ',' R  RrWWWrR  R  ','   R RRRRR R    ','  R  R   R  R   '],
- mug:['     W  W       ','    W  W        ','     W          ','   KWWWWWWK     ','   WLLLLLLWKK   ','   WLKKLLLWWLK  ','   WLLKLLLWWLK  ','   WLKKKLLWKK   ','   WLLLLLLW     ','    KWWWWK      '],
- floppy:['   KBBBBBBBBBK  ','   BBBKbbKBBBB  ','   BBBKWWKBBBB  ','   BBBKKKKBBBB  ','   BBBBBBBBBBB  ','   BBWWWWWWWBB  ','   BBWbbbbWWBB  ','   BBWWWWWWWBB  ','   KBBBBBBBBBK  '],
- robot:['       O        ','       K        ','    KGGGGGK     ','   KgbKKbggK    ','   KgLKKLggK    ','    KgggggK     ','  KgKKGGGKKgK   ','  g  GYGYG  g   ','     KGGGK      ','    KK   KK     '],
- scope:['       KBK      ','      KbWK      ','     KbWK       ','     KbK K      ','     DD  bK     ','   KbKK  bK     ','    W    bK     ','  KKKKK  BK     ','        BBK     ','   KBBBBBBBK    ']
-};
-const glyphs={read:[' GGG GGG ',' GLG GLG ',' GLG GLG ',' GLG GLG ',' GGGGGGG ','    G    '],design:['    Y    ','   YOY   ','  YOKOY  ','   YOY   ','    Y    '],code:[' B     B ','B   b   B',' B b   B ','  b  B   '],infer:['  GGG    ',' GbbWG   ',' GbWWG   ','  GGGK   ','      KK '],write:['      RO ','     RYO ','    RYO  ','   RYO   ','  KYO    ',' KK      ']};
-function stamp(ctx,pattern,x,y,scale=1){pattern?.forEach((line,j)=>{for(let i=0;i<line.length;i++){const col=palette[line[i]];if(col){ctx.fillStyle=col;ctx.fillRect(x+i*scale,y+j*scale,scale,scale)}}});}
-function paintIcons(){document.querySelectorAll('canvas[data-sprite]').forEach(c=>{const key=c.dataset.sprite,ctx=c.getContext('2d'),p=icons[key]||glyphs[key];c.width=c.height=18;ctx.clearRect(0,0,18,18);if(p)stamp(ctx,p,Math.floor((18-Math.max(...p.map(l=>l.length)))/2),Math.floor((18-p.length)/2));});}
+// The room redraws once the PNGs are ready, even if they arrived after the first frame.
+const itemImages = Object.fromEntries(Object.keys(lootDefs).map(id => {
+ const image = new Image();
+ image.src = './assets/images/items/' + id + '.png';
+ return [id,image];
+}));
+const roomImagesReady = Promise.all(Object.values(itemImages).map(image => image.decode().catch(() => {})));
+function drawItem(ctx,id,x,y,scale,bottom=false){
+ const image=itemImages[id];
+ if(!image?.complete || !image.naturalWidth)return;
+ const w=Math.round(image.naturalWidth*scale),h=Math.round(image.naturalHeight*scale);
+ ctx.imageSmoothingEnabled=false;ctx.drawImage(image,x,bottom?y-h:y,w,h);
+}
 // Sky bands, distant hills, and trees use the same local-time palette.
 const skyPalettes = {
  night:['#253554','#354766','#4d6076','#63777f','#516774','#3e535e','#334955','#415963'],
@@ -73,7 +73,7 @@ function paintRoom(slots,date=new Date()){
  R(135,43,86,3,shadow);R(133,40,89,3,dark);R(134,39,87,2,bright);R(141,43,3,4,dark);R(212,43,3,4,dark);
  const bcols=['#a4624d','#638277','#d4b776','#80889a','#9c775f','#688b8b','#c29b60'];
  for(let i=0;i<7;i++){const x=139+i*5,h=11+(i*7)%10;R(x,39-h,4,h,bcols[i]);R(x+1,40-h,1,h-2,'#d6c9a6');R(x,35,4,1,edge);}
- R(183,36,18,3,'#7e7561');R(184,33,15,3,'#d5be8b');R(186,31,16,2,'#729286');stamp(q,icons.plant,201,19,1.6);
+ R(183,36,18,3,'#7e7561');R(184,33,15,3,'#d5be8b');R(186,31,16,2,'#729286');drawItem(q,'plant',201,19,1.6);
  R(243,15,59,42,shadow);R(241,13,60,42,dark);R(243,15,56,38,'#c5a075');
  for(let y=18;y<52;y+=4)for(let x=246;x<298;x+=5)R(x,y,1,1,'#b18d68');
  for(const [x,y,col] of [[245,19,'#e5c984'],[262,17,'#d8d6ab'],[276,22,'#eddfb0'],[260,34,'#e8ba8a']]){R(x+1,y+1,13,12,'#ab8f69');R(x,y,13,12,col);R(x+5,y-1,2,2,'#885a45');R(x+2,y+4,7,1,'#9b9475');R(x+2,y+7,5,1,'#9b9475');}
@@ -90,9 +90,11 @@ function paintRoom(slots,date=new Date()){
  // Chair faces the bench.
  R(148,113,29,18,edge);R(150,112,25,16,'#6a8c78');R(152,113,21,3,'#92a58a');R(149,128,27,3,'#587663');R(158,131,7,7,dark);R(144,136,32,4,edge);R(146,135,29,3,'#799680');
  R(157,140,5,9,edge);R(149,148,21,2,edge);R(146,149,6,3,line);R(167,149,6,3,line);
- const positions=[80,122,221];slots.forEach((id,i)=>{const x=positions[i];if(id){const pat=icons[id],scale=1.45; // integer coordinates preserve crisp edges in the low-resolution raster
- for(let y=0;y<pat.length;y++)for(let j=0;j<pat[y].length;j++){let color=palette[pat[y][j]];if(color)R(x+Math.round(j*scale),103-Math.round((pat.length-y)*scale),Math.round((j+1)*scale)-Math.round(j*scale),Math.round((pat.length-y)*scale)-Math.round((pat.length-y-1)*scale),color);}
- }else{R(x+4,102,12,1,'#a98a67');}});
+ const positions=[80,122,221];
+ slots.forEach((id,i)=>{
+   if(id)drawItem(q,id,positions[i],103,1.45,true);
+   else R(positions[i]+4,102,12,1,'#a98a67');
+ });
  if(sky.dim>0){
    q.save();q.globalAlpha=.34*sky.dim;R(0,0,360,166,'#162641');
    q.globalAlpha=.19*sky.dim;
@@ -110,4 +112,3 @@ function paintRoom(slots,date=new Date()){
  }
  c.setAttribute('aria-label',sky.label+' 풍경의 작업 책상. '+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
 }
-function logo(){const c=document.querySelector('#brand-art'),q=c.getContext('2d');stamp(q,['     L       g      ','      L     g       ','       ggggg        ','    gggLLLLLggg     ','   gLLgggggggLLg    ','   gLLKWWKWWKLLg    ','   gLLKWWKWWKLLg    ','   gLLgggggggLLg    ','    gLLgggggLLg     ','      ggggggg       ','       G   G        '],1,4);}

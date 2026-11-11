@@ -4,7 +4,7 @@ const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const tFor=id=>tracks.find(t=>t.id===id);
 const rng=n=>{const r=new Uint32Array(1);crypto.getRandomValues(r);return r[0]%n};
 const choose=a=>a[rng(a.length)];
-const blank=()=>({version:1,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
+const blank=()=>({version:1,field:'',showOffer:false,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 let state=blank(), loaded=true, toastTimer, selectedLoot=null, home=true;
 try {const s=JSON.parse(localStorage.getItem(key)||'null');if(s && labSave.valid(s))state=s;}catch{loaded=false}
 function save(confirmLocal=false){
@@ -13,7 +13,10 @@ function save(confirmLocal=false){
  catch{loaded=false;$('save-state').textContent='현재 창에만 저장';return false;}
 }
 function toast(s){$('toast').textContent=s;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').textContent='',2800);}
-function sprite(id,cls='sprite'){return '<canvas width="18" height="18" data-sprite="'+id+'" class="'+cls+'" aria-hidden="true"></canvas>'}
+function sprite(id,cls='sprite'){
+ const group=Object.hasOwn(lootDefs,id)?'items':'skills';
+ return '<img class="'+cls+'" width="18" height="18" alt="" src="./assets/images/'+group+'/'+id+'.png">';
+}
 function b(label,act,cls='secondary',arg=''){return '<button type="button" class="'+cls+'" data-do="'+act+'" data-arg="'+escapeHTML(arg)+'">'+escapeHTML(label)+'</button>'}
 function stats(t,i){const list=state.quests.filter(q=>q.status==='done'&&q.track===t&&q.skill===i);return {xp:list.length,rank:list.reduce((n,q)=>Math.max(n,q.rankAfter||0),0)}}
 function find(id){return state.quests.find(q=>q.id===id)}
@@ -22,14 +25,18 @@ function qRow(q,done){return '<button class="'+(done?'journal-row':'quest-row')+
 function render(){
  const active=state.quests.filter(q=>q.status!=='done').slice().reverse(),done=state.quests.filter(q=>q.status==='done').sort((a,b)=>b.ended-a.ended);
  const offer=requests[state.offer];$('active-counter').textContent='진행 '+active.length;
- $('quest-board').innerHTML='<div class="board-inner"><div class="offer"><span class="mini-label">연구실 의뢰</span><h3>'+escapeHTML(offer[0])+'</h3><p>'+escapeHTML(offer[1])+'</p><div class="actions">'+b('의뢰 수락','accept','secondary')+b('다른 의뢰 뽑기','reroll','textbtn')+'</div></div>'+(active.length?'<div class="running-label">내 퀘스트</div>'+active.map(q=>qRow(q,false)).join(''):'')+'</div>';
+ $('field-button').textContent=state.field?'연구 분야 · '+state.field:'연구 분야 설정';
+ const suggestion=state.showOffer?
+  '<div class="offer"><span class="mini-label">연구실 의뢰</span><h3>'+escapeHTML(offer[0])+'</h3><p>'+escapeHTML(offer[1])+'</p><div class="actions">'+b('의뢰 수락','accept')+b('다른 의뢰 뽑기','reroll','textbtn')+'</div></div>':
+  '<div class="board-empty">'+(!active.length?'<p>진행 중인 퀘스트가 없어요.</p>':'')+b('의뢰 뽑기','reroll','textbtn')+'</div>';
+ $('quest-board').innerHTML='<div class="board-inner">'+suggestion+(active.length?'<div class="running-label">내 퀘스트</div>'+active.map(q=>qRow(q,false)).join(''):'')+'</div>';
  $('skills').innerHTML=tracks.map(t=>{const totals=t.skills.map((_,i)=>stats(t.id,i));const n=totals.filter(s=>s.rank>=2).length, xp=totals.reduce((sum,s)=>sum+s.xp,0);return '<button class="skill-row" data-do="skill" data-arg="'+t.id+'">'+sprite(t.id,'skill-icon')+'<b>'+t.name+'</b><span class="hint">'+t.hint+'</span>'+(xp?'<span class="skill-xp">경험 '+xp+'</span>':'')+'<span class="skill-num">'+n+' / '+t.skills.length+' ›</span></button>'}).join('');
  const ids=Object.keys(lootDefs),owned=ids.filter(i=>state.inventory[i]);$('loot-count').textContent=owned.length+' / '+ids.length+'종';
  $('loot').innerHTML=ids.map(i=>state.inventory[i]?'<button class="loot-cell" data-do="item" data-arg="'+i+'" aria-label="'+lootDefs[i][0]+'">'+sprite(i)+'<small>×'+state.inventory[i]+'</small></button>':'<span class="loot-cell unknown" aria-label="미발견 아이템">?</span>').join('')+'<p class="drawer-note">'+(owned.length===1?'새싹 화분은 입실 선물이에요.':'수집한 아이템을 선택해 책상에 놓으세요.')+'</p>';
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- reviewDay=null;resetClockView();paintIcons();
+ reviewDay=null;resetClockView();
 }
 let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
 let writingShift=false;
@@ -114,9 +121,24 @@ function changeTab(isHome){home=isHome;if(modal.open)modal.close();render();wind
 function show(context,title,body){
  currentReview=null;
  $('dialog-context').textContent=context;$('modal-body').innerHTML='<div class="modal-content"><h2 id="dialog-name">'+escapeHTML(title)+'</h2>'+body+'</div>';
- modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;paintIcons();
+ modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;
 }
-function takeOffer(){const current=state.offer;let available=requests.map((_,i)=>i).filter(i=>!state.seenOffers.includes(i));
+function fieldForm(){
+ show('내 연구실','연구 분야 설정','<form id="field-form"><label class="field">연구 분야<input type="text" id="field-name" maxlength="60" placeholder="예: 천문학, 생태학, VLM" value="'+escapeHTML(state.field||'')+'"></label><button class="primary" type="submit">저장</button></form>');
+ const form=$('field-form');
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  const previous=state.field, owner=pixelAccount.uid;
+  state.field=$('field-name').value.trim();form.querySelector('button').disabled=true;
+  try{
+   if(!await save(true))throw Error('storage');
+   if(owner===pixelAccount.uid && modal.open && form===$('field-form'))modal.close();
+  }catch{if(owner===pixelAccount.uid){state.field=previous;toast('분야를 저장하지 못했어요. 다시 시도해 주세요.');}}
+  finally{form.querySelector('button').disabled=false;render();}
+ };
+ $('field-name').focus();
+}
+function takeOffer(){if(!state.showOffer){state.showOffer=true;state.offer=choose(requests.map((_,i)=>i));state.seenOffers=[state.offer];return;}const current=state.offer;let available=requests.map((_,i)=>i).filter(i=>!state.seenOffers.includes(i));
  if(!available.length){state.seenOffers=[current];available=requests.map((_,i)=>i).filter(i=>i!==current);}
  state.offer=choose(available);state.seenOffers.push(state.offer);
 }
@@ -125,7 +147,7 @@ function make(question,track,skill,title=''){
  const q={id,question,track,skill,title,status:'ready',created:Date.now()};state.quests.push(q);return q;
 }
 function newForm(){
- show('퀘스트 보드','새 퀘스트','<form id="register-form"><label class="field">알아내고 싶은 질문<textarea id="question" maxlength="260" required placeholder="예: 같은 사진에서 지시문만 바꾸면 로봇의 첫 행동도 달라질까?"></textarea></label><label class="field">키울 능력치<select id="track">'+tracks.map(t=>'<option value="'+t.id+'">'+t.name+'</option>').join('')+'</select></label><label class="field">연습할 스킬<select id="skill"></select></label><button class="primary" type="submit">질문 등록</button></form>');
+ show(state.field||'퀘스트 보드','새 퀘스트','<form id="register-form"><label class="field">알아내고 싶은 질문<textarea id="question" maxlength="260" required placeholder="예: 비교 조건 하나를 바꾸면 관찰 결과도 달라질까?"></textarea></label><label class="field">키울 능력치<select id="track">'+tracks.map(t=>'<option value="'+t.id+'">'+t.name+'</option>').join('')+'</select></label><label class="field">연습할 스킬<select id="skill"></select></label><button class="primary" type="submit">질문 등록</button></form>');
  const options=()=>{$('skill').innerHTML=tFor($('track').value).skills.map((s,i)=>'<option value="'+i+'">'+s+'</option>').join('')};options();$('track').onchange=options;
  $('register-form').onsubmit=e=>{e.preventDefault();const field=$('question');if(!field.value.trim()){field.setCustomValidity('질문을 입력해 주세요.');field.reportValidity();return;}
  const q=make(field.value.trim(),$('track').value,Number($('skill').value));save();render();quest(q.id);};$('question').oninput=e=>e.target.setCustomValidity('');$('question').focus();
@@ -165,7 +187,7 @@ function refreshGuestForReview(){
  if(latest && labSave.valid(latest))state=latest;
 }
 function newReview(){
- show('오늘의 복습','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 로봇이 물체를 놓쳤을 때, 폐루프 제어는 어떻게 대응할까?"></textarea></label>'+
+ show('오늘의 복습','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 이 실험에서 대조군을 둔 이유는 무엇일까?"></textarea></label>'+
   '<label class="field">기억하고 싶은 답<textarea id="review-answer" required maxlength="4000"></textarea></label>'+
   '<p class="muteline">첫 복습은 내일이에요. 복습할 때는 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
  const form=$('review-form');
@@ -265,7 +287,7 @@ function quest(id){
  const draft=()=>{q.draft={finding:$('finding').value,verdict:$('verdict').value,mastery:$('mastery').value};save()};
  $('finish-form').oninput=e=>{if(e.target.id==='finding')e.target.setCustomValidity('');draft()};$('finish-form').onchange=draft;
  $('finish-form').onsubmit=e=>{e.preventDefault();if(q.status!=='active')return;const evidence=$('finding').value.trim();if(!evidence){$('finding').setCustomValidity('직접 관찰한 내용을 적어 주세요.');$('finding').reportValidity();return;}
-  const before=stats(q.track,q.skill).rank;const eligible=Object.keys(lootDefs).filter(x=>x!=='plant');const unseen=eligible.filter(x=>!state.inventory[x]);const item=q.title===requests[0][0]?'lens':choose(unseen.length?unseen:eligible);
+  const before=stats(q.track,q.skill).rank;const eligible=Object.keys(lootDefs).filter(x=>x!=='plant');const unseen=eligible.filter(x=>!state.inventory[x]);const item=(q.title===requests[0][0]||q.title==='사라진 한 프레임')?'lens':choose(unseen.length?unseen:eligible);
   Object.assign(q,{finding:evidence,verdict:$('verdict').value,rankBefore:before,rankAfter:Math.max(before,Number($('mastery').value)),loot:item,status:'done',ended:Date.now()});delete q.draft;state.inventory[item]=(state.inventory[item]||0)+1;save();render();reward(q);};
 }
 function itemBox(i){return '<div class="reward">'+sprite(i)+'<div><h3>'+lootDefs[i][0]+'</h3><p>'+lootDefs[i][1]+'</p></div></div>'}
@@ -295,7 +317,7 @@ function summary(s) {
 function savePanel(message='') {
   pendingImport = null;
   const previous = !pixelAccount.uid && storedValue(previousKey);
-  const webLink = localDemo ? '<p class="save-guide">이 파일에서 세이브를 내보낸 뒤, <a href="https://2e2guk.github.io/pixel-research-lab/" target="_blank" rel="noopener">배포된 연구실 열기 ↗</a>에서 가져오세요.</p>' : (pixelAccount.uid ? '<p class="save-guide">같은 계정의 다른 기기와 자동 동기화됩니다. 파일로도 백업할 수 있어요.</p>' : '<p class="save-guide">로그인하면 같은 계정의 기기에서 이어 할 수 있어요.</p>'+b('계정 연결','account'));
+  const webLink = localDemo ? '<p class="save-guide">이 파일에서 세이브를 내보낸 뒤, <a href="https://pixel-research-lab.github.io/pixel-research-lab/" target="_blank" rel="noopener">배포된 연구실 열기 ↗</a>에서 가져오세요.</p>' : (pixelAccount.uid ? '<p class="save-guide">같은 계정의 다른 기기와 자동 동기화됩니다. 파일로도 백업할 수 있어요.</p>' : '<p class="save-guide">로그인하면 같은 계정의 기기에서 이어 할 수 있어요.</p>'+b('계정 연결','account'));
   show('내 연구실','세이브 관리',summary(state)+webLink+
     '<div class="actions">'+b('세이브 내보내기','export-save','primary')+b('세이브 가져오기','choose-save')+'</div>'+
     '<input type="file" id="save-file" hidden accept=".json,application/json">'+
@@ -347,7 +369,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'shift':recordShift(arg);break;
  case 'focus-clock':$('shift-main').focus();break;
  case 'account':accountPanel();break;
- case 'sign-in':pixelAccount.login().catch(e=>{const field=$('auth-feedback');if(field)field.textContent=e.code==='auth/popup-closed-by-user'?'로그인 창이 닫혔어요.':'로그인을 마치지 못했어요. 인터넷 연결과 팝업 허용을 확인해 주세요.';});break;
+ case 'sign-in':pixelAccount.login(!!$('link-guest')?.checked).catch(e=>{const field=$('auth-feedback');if(field)field.textContent=e.code==='auth/popup-closed-by-user'?'로그인 창이 닫혔어요.':'로그인을 마치지 못했어요. 인터넷 연결과 팝업 허용을 확인해 주세요.';});break;
  case 'sign-out':pixelAccount.logout().catch(()=>toast('로그아웃을 완료하지 못했어요.'));break;
  case 'sync-now':pixelAccount.retry();break;
  case 'save-panel':savePanel();break;
@@ -356,6 +378,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'previous-save':try {previewImport(labSave.read(storedValue(previousKey)), true);} catch {savePanel('이전 세이브를 읽을 수 없어요.');}break;
  case 'apply-save':applyImport();break;
  case 'music':if(navigator.onLine){window.open('https://www.youtube.com/','_blank','noopener,noreferrer');}else{toast('스피커는 인터넷에 연결한 뒤 켤 수 있어요.');}break;
+ case 'field':fieldForm();break;
  case 'new':newForm();break; case 'reroll':takeOffer();save();render();break;
  case 'accept':{const r=requests[state.offer];const ongoing=state.quests.find(q=>q.status!=='done'&&q.title===r[0]);const q=ongoing||make(r[1],r[2],r[3],r[0]);takeOffer();save();render();quest(q.id);break;}
  case 'quest':quest(arg);break;case 'record':record(arg);break;case 'skill':skillSheet(arg);break;
@@ -375,7 +398,8 @@ function accountPanel(){
  const account=pixelAccount;
  const info=account.uid
   ? '<p>'+escapeHTML(account.email||'연결된 계정')+'</p><p id="account-state"></p><div class="actions">'+b('지금 동기화','sync-now')+b('로그아웃','sign-out','textbtn')+'</div><p class="save-guide">'+('SyncManager' in window?'탭을 닫은 뒤에는 브라우저가 허용할 때 대기 기록을 보내요.':'오프라인에서 창을 닫았다면 인터넷에 연결한 뒤 연구실을 다시 열어 주세요.')+'</p>'
-  : '<p>로그인 전 연구실은 이 브라우저에서 이어져요. 처음 연결하면 여기에 있는 퀘스트, 복습 카드, 책상 배치, 출퇴근 기록을 내 계정으로 옮겨요. 다른 기기에서도 같은 Google 계정으로 로그인하세요.</p>'+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
+  : '<p>같은 Google 계정으로 로그인하면 내 연구실을 이어갈 수 있어요. 새 계정은 빈 연구실로 시작해요.</p>'+
+    (pixelAccountGuest()?'<label class="guest-import"><input id="link-guest" type="checkbox"> 이 브라우저의 게스트 기록도 내 계정으로 옮기기</label>':'')+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
  show('내 연구실','계정 동기화',info);
  if($('account-state'))$('account-state').textContent=account.status;
 }
@@ -402,5 +426,6 @@ pixelAccount.init({
  apply:redraw,alert:toast,
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });
-if(!loaded)$('save-state').textContent='현재 창에만 저장';logo();render();
+if(!loaded)$('save-state').textContent='현재 창에만 저장';render();
+roomImagesReady.then(()=>paintRoom(state.slots));
 })();

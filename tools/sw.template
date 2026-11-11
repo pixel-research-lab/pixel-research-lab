@@ -1,4 +1,4 @@
-importScripts('./cloud-worker.js');
+importScripts('./dist/cloud-worker.js');
 const prefix = 'pixel-research-lab:' + self.registration.scope + ':';
 const cacheName = prefix + 'BUILD_HASH';
 const assetNames = ASSET_LIST;

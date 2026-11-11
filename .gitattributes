@@ -1,2 +1,2 @@
-cloud-account.js linguist-generated=true whitespace=-trailing-space
-cloud-worker.js linguist-generated=true whitespace=-trailing-space
+dist/cloud-account.js linguist-generated=true whitespace=-trailing-space
+dist/cloud-worker.js linguist-generated=true whitespace=-trailing-space

@@ -1,5 +1,5 @@
 // Each quest earns one reward. Completing it on two devices still produces one entry.
-export const emptyLab = () => ({version:1,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
+export const emptyLab = () => ({version:1,field:'',showOffer:false,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 const phase = {ready:1, active:2, done:3};
 export function parts(state) {
   const entries = new Map();
@@ -15,7 +15,8 @@ export function parts(state) {
   }
   for (const [id,n] of Object.entries(extras)) if (n>0) entries.set('gift~'+id,n);
   state.slots.forEach((item,i)=>entries.set('slot~'+i,item));
-  entries.set('board',{offer:state.offer,seenOffers:state.seenOffers});
+  entries.set('field',state.field||'');
+  entries.set('board',{offer:state.offer,seenOffers:state.seenOffers,showOffer:!!state.showOffer});
   return entries;
 }
 export function changes(before, after, seed=false) {
@@ -54,6 +55,7 @@ export function materialize(rows) {
     if (id.startsWith('time~')) state.attendance.push(value);
     if (id.startsWith('gift~')) gift[id.slice(5)]=value;
     if (id.startsWith('slot~')) slots[Number(id.slice(5))]=row;
+    if (id==='field') state.field=value;
     if (id==='board') Object.assign(state,value);
   }
   for (const card of state.reviews) card.attempts = attempts.get(card.id) || [];

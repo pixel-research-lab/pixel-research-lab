@@ -1,6 +1,6 @@
 // Count visits to the published game only. Never include a quest, save or account identifier.
 (() => {
-  if(location.origin!=='https://2e2guk.github.io' || !navigator.onLine) return;
+  if(location.origin!=='https://pixel-research-lab.github.io' || !navigator.onLine) return;
   const measurement='G-K8XT7HM09Y';
   window.dataLayer=window.dataLayer||[];
   function gtag(){window.dataLayer.push(arguments);}
