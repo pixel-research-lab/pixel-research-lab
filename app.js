@@ -4,7 +4,7 @@ const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const tFor=id=>tracks.find(t=>t.id===id);
 const rng=n=>{const r=new Uint32Array(1);crypto.getRandomValues(r);return r[0]%n};
 const choose=a=>a[rng(a.length)];
-const blank=()=>({version:1,quests:[],attendance:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
+const blank=()=>({version:1,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 let state=blank(), loaded=true, toastTimer, selectedLoot=null, home=true;
 try {const s=JSON.parse(localStorage.getItem(key)||'null');if(s && labSave.valid(s))state=s;}catch{loaded=false}
 function save(confirmLocal=false){
@@ -29,9 +29,9 @@ function render(){
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- resetClockView();paintIcons();
+ reviewDay=null;resetClockView();paintIcons();
 }
-let studyDay, paintedMinute, recordedSecond, loggedMinute;
+let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
 let writingShift=false;
 const shiftActions={
  idle:['start','연구 시작'], working:['pause','잠시 비움'], paused:['resume','연구 재개']
@@ -44,6 +44,8 @@ function resetClockView(){
 function updateClock(){
  if(!studyDay)return;
  const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
+ const day=reviewSchedule.today(date);
+ if(reviewDay!==day){paintReviews(day);reviewDay=day;}
  if(home && paintedMinute!==minute){paintRoom(state.slots,date);paintedMinute=minute;}
  if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
  const second=Math.floor(now/1000);
@@ -110,6 +112,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCloc
 window.addEventListener('pageshow',updateClock);
 function changeTab(isHome){home=isHome;if(modal.open)modal.close();render();window.scrollTo({top:0});}
 function show(context,title,body){
+ currentReview=null;
  $('dialog-context').textContent=context;$('modal-body').innerHTML='<div class="modal-content"><h2 id="dialog-name">'+escapeHTML(title)+'</h2>'+body+'</div>';
  modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;paintIcons();
 }
@@ -126,6 +129,125 @@ function newForm(){
  const options=()=>{$('skill').innerHTML=tFor($('track').value).skills.map((s,i)=>'<option value="'+i+'">'+s+'</option>').join('')};options();$('track').onchange=options;
  $('register-form').onsubmit=e=>{e.preventDefault();const field=$('question');if(!field.value.trim()){field.setCustomValidity('질문을 입력해 주세요.');field.reportValidity();return;}
  const q=make(field.value.trim(),$('track').value,Number($('skill').value));save();render();quest(q.id);};$('question').oninput=e=>e.target.setCustomValidity('');$('question').focus();
+}
+let currentReview=null, savingReview=false;
+function reviewById(id){return (state.reviews||[]).find(card=>card.id===id);}
+function reviewDate(day){return new Date(day+'T12:00:00').toLocaleDateString('ko-KR',{month:'long',day:'numeric'});}
+function reviewRows(){
+ return (state.reviews||[]).map(card=>({card,...reviewSchedule.progress(card)}))
+   .sort((a,b)=>(a.due||'').localeCompare(b.due||'') || a.card.question.localeCompare(b.card.question,'ko'));
+}
+function reviewRow(row,archived=false){
+ const detail=archived?reviewDate(row.finished)+' 완료':row.streak+' / 4 연속 정답';
+ return '<button class="quest-row review-row" data-do="'+(archived?'review-record':'review')+'" data-arg="'+row.card.id+
+  '"><span><small>'+detail+'</small><strong>'+escapeHTML(row.card.question)+'</strong></span><span class="arrow" aria-hidden="true">›</span></button>';
+}
+function paintReviews(day){
+ const rows=reviewRows(), due=rows.filter(r=>r.due && r.due<=day), upcoming=rows.filter(r=>r.due>day);
+ const archived=rows.filter(r=>r.finished).sort((a,b)=>b.finished.localeCompare(a.finished));
+ const empty=upcoming.length?'다음 복습은 '+reviewDate(upcoming[0].due)+'이에요.':
+  rows.length?'오늘 풀 복습이 없어요.':'질문과 답을 등록하면 내일부터 복습할 수 있어요.';
+ $('review-board').innerHTML=(due.length?due.map(r=>reviewRow(r)).join(''):'<p class="review-empty">'+empty+'</p>')+
+  '<div class="review-footer"><span>복습 XP '+rows.reduce((sum,r)=>sum+r.xp,0)+'</span>'+
+  (upcoming.length?b('복습 예정 '+upcoming.length+'개','upcoming','textbtn'):'')+'</div>';
+ $('review-count').textContent=archived.length+'건';
+ $('review-records').innerHTML=archived.length?archived.map(r=>reviewRow(r,true)).join(''):
+  '<div class="empty-log">네 번 연속 맞힌 질문이 여기에 남아요.</div>';
+}
+function upcomingReviews(){
+ const rows=reviewRows().filter(r=>r.due>reviewSchedule.today());
+ show('오늘의 복습','복습 예정',rows.map(r=>'<div class="upcoming-review"><small>'+reviewDate(r.due)+' · '+r.streak+' / 4</small><p>'+
+  escapeHTML(r.card.question)+'</p></div>').join('')+b('닫기','close'));
+}
+function refreshGuestForReview(){
+ if(pixelAccount.uid)return;
+ const latest=pixelAccountGuest();
+ if(latest && labSave.valid(latest))state=latest;
+}
+function newReview(){
+ show('오늘의 복습','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 로봇이 물체를 놓쳤을 때, 폐루프 제어는 어떻게 대응할까?"></textarea></label>'+
+  '<label class="field">기억하고 싶은 답<textarea id="review-answer" required maxlength="4000"></textarea></label>'+
+  '<p class="muteline">첫 복습은 내일이에요. 복습할 때는 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
+ const form=$('review-form');
+ form.oninput=e=>e.target.setCustomValidity('');
+ form.onsubmit=async e=>{
+  e.preventDefault();if(savingReview)return;
+  for(const field of [$('review-question'),$('review-answer')]){
+   if(!field.value.trim()){field.setCustomValidity('내용을 입력해 주세요.');field.reportValidity();return;}
+  }
+  const card={id:crypto.randomUUID(),question:$('review-question').value.trim(),answer:$('review-answer').value.trim(),
+    firstDue:reviewSchedule.addDays(reviewSchedule.today(),1),attempts:[]};
+  const owner=pixelAccount.uid;refreshGuestForReview();
+  state.reviews=[...(state.reviews||[]),card];savingReview=true;
+  const submit=form.querySelector('button');submit.disabled=true;
+  try{
+   if(!await save(true))throw Error('storage');
+   if(pixelAccount.uid===owner && form===$('review-form') && modal.open){
+    modal.close();toast('저장했어요. 첫 복습은 '+reviewDate(card.firstDue)+'이에요.');
+   }
+  }catch{
+   if(pixelAccount.uid===owner){state.reviews=(state.reviews||[]).filter(c=>c.id!==card.id);toast('카드를 저장하지 못했어요. 다시 눌러 주세요.');}
+  }finally{savingReview=false;submit.disabled=false;render();}
+ };
+ $('review-question').focus();
+}
+function openReview(id){
+ const card=reviewById(id);if(!card)return;
+ const {due,streak,finished}=reviewSchedule.progress(card);
+ if(finished){reviewRecord(id);return;}
+ if(due>reviewSchedule.today()){upcomingReviews();return;}
+ show('오늘의 복습 · '+streak+' / 4 연속 정답',card.question,'<label class="field">떠올린 답 <small>(선택)</small><textarea id="recall" maxlength="4000" placeholder="말로 떠올리거나 여기에 적어 보세요."></textarea></label>'+
+  '<div class="actions">'+b('답 확인','compare-review','primary')+b('모르겠다','grade-no')+'</div>');
+ currentReview={id,due};
+}
+function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span><p>'+escapeHTML(card.answer)+'</p></div>';}
+function currentTurn(){
+ const round=currentReview,card=round && reviewById(round.id);
+ if(!card || reviewSchedule.progress(card).due!==round.due || round.due>reviewSchedule.today()){
+  if(modal.open)modal.close();render();toast('복습 일정이 바뀌었어요. 오늘의 복습을 확인해 주세요.');return null;
+ }
+ return {round,card};
+}
+function compareReview(){
+ const turn=currentTurn();if(!turn)return;
+ const {round,card}=turn, guess=$('recall').value.trim();
+ show('오늘의 복습 · 답 비교',card.question,(guess?'<div class="review-guess"><small>떠올린 답</small><p>'+escapeHTML(guess)+'</p></div>':'')+
+  answerBlock(card)+'<div class="actions">'+b('맞혔다','grade-yes','primary')+b('모르겠다','grade-no')+'</div>');
+ currentReview=round;
+}
+async function gradeReview(correct){
+ if(savingReview)return;
+ refreshGuestForReview();
+ const turn=currentTurn();if(!turn)return;
+ const {round,card}=turn,owner=pixelAccount.uid,before=reviewSchedule.progress(card);
+ const attempt={due:round.due,day:reviewSchedule.today(),correct};
+ card.attempts.push(attempt);
+ savingReview=true;
+ const buttons=[...$('modal-body').querySelectorAll('button')];
+ buttons.forEach(el=>el.disabled=true);
+ try{
+  if(!await save(true))throw Error('storage');
+  if(owner!==pixelAccount.uid || !modal.open || currentReview!==round)return;
+  const saved=reviewById(card.id),after=saved && reviewSchedule.progress(saved);
+  if(!after){modal.close();return;}
+  const next=reviewRows().find(r=>r.due && r.due<=reviewSchedule.today());
+  const delta=after.xp-before.xp, heading=after.finished?'복습 완료 · 4회 연속 정답':after.streak?'연속 정답 '+after.streak+' / 4':'다시 복습';
+  show(heading,card.question,answerBlock(saved)+'<p class="skill-result">'+
+   (after.finished?'연구 일지의 완료한 복습에 남겼어요.':'다음 복습 · '+reviewDate(after.due))+
+   (delta>0?' · 복습 XP +'+delta:'')+'</p><div class="actions">'+(next?b('다음 질문','review','primary',next.card.id):'')+b('닫기','close')+'</div>');
+ }catch{
+  if(owner===pixelAccount.uid){
+   const latest=reviewById(card.id);
+   if(latest)latest.attempts=latest.attempts.filter(a=>a!==attempt);
+   toast('복습 결과를 저장하지 못했어요. 다시 눌러 주세요.');
+  }
+ }finally{savingReview=false;buttons.forEach(el=>el.disabled=false);render();}
+}
+function reviewRecord(id){
+ const card=reviewById(id);if(!card)return;
+ const progress=reviewSchedule.progress(card);if(!progress.finished)return;
+ show('완료한 복습 · '+reviewDate(progress.finished),card.question,answerBlock(card)+
+  '<p class="skill-result">4회 연속 정답 · 복습 XP '+progress.xp+'</p>'+b('닫기','close'));
 }
 function quest(id){
  const q=find(id);if(!q)return;if(q.status==='done'){record(id);return}
@@ -168,7 +290,7 @@ function storedValue(name) {
 function summary(s) {
   const done = s.quests.filter(q => q.status === 'done').length;
   const slots = s.slots.map(id => id ? lootDefs[id][0] : '빈 자리');
-  return '<p class="save-summary">진행 중 '+(s.quests.length-done)+'개 · 완료 '+done+'개<br>책상 왼쪽부터 '+slots.join(' · ')+'</p>';
+  return '<p class="save-summary">진행 중 '+(s.quests.length-done)+'개 · 완료 '+done+'개 · 복습 카드 '+(s.reviews||[]).length+'장<br>책상 왼쪽부터 '+slots.join(' · ')+'</p>';
 }
 function savePanel(message='') {
   pendingImport = null;
@@ -215,6 +337,13 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
  save();render();desk();toast(lootDefs[id][0]+' 배치 완료');}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
+ case 'new-review':newReview();break;
+ case 'review':openReview(arg);break;
+ case 'upcoming':upcomingReviews();break;
+ case 'compare-review':compareReview();break;
+ case 'grade-yes':gradeReview(true);break;
+ case 'grade-no':gradeReview(false);break;
+ case 'review-record':reviewRecord(arg);break;
  case 'shift':recordShift(arg);break;
  case 'focus-clock':$('shift-main').focus();break;
  case 'account':accountPanel();break;
@@ -226,7 +355,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'choose-save':$('save-file').click();break;
  case 'previous-save':try {previewImport(labSave.read(storedValue(previousKey)), true);} catch {savePanel('이전 세이브를 읽을 수 없어요.');}break;
  case 'apply-save':applyImport();break;
- case 'music':if(navigator.onLine){window.open('https://www.youtube.com/watch?v=jfKfPfyJRdk','_blank','noopener,noreferrer');}else{toast('스피커는 인터넷에 연결한 뒤 켤 수 있어요.');}break;
+ case 'music':if(navigator.onLine){window.open('https://www.youtube.com/','_blank','noopener,noreferrer');}else{toast('스피커는 인터넷에 연결한 뒤 켤 수 있어요.');}break;
  case 'new':newForm();break; case 'reroll':takeOffer();save();render();break;
  case 'accept':{const r=requests[state.offer];const ongoing=state.quests.find(q=>q.status!=='done'&&q.title===r[0]);const q=ongoing||make(r[1],r[2],r[3],r[0]);takeOffer();save();render();quest(q.id);break;}
  case 'quest':quest(arg);break;case 'record':record(arg);break;case 'skill':skillSheet(arg);break;
@@ -246,7 +375,7 @@ function accountPanel(){
  const account=pixelAccount;
  const info=account.uid
   ? '<p>'+escapeHTML(account.email||'연결된 계정')+'</p><p id="account-state"></p><div class="actions">'+b('지금 동기화','sync-now')+b('로그아웃','sign-out','textbtn')+'</div><p class="save-guide">'+('SyncManager' in window?'탭을 닫은 뒤에는 브라우저가 허용할 때 대기 기록을 보내요.':'오프라인에서 창을 닫았다면 인터넷에 연결한 뒤 연구실을 다시 열어 주세요.')+'</p>'
-  : '<p>로그인 전 연구실은 이 브라우저에서 이어져요. 처음 연결하면 여기에 있는 퀘스트, 책상 배치, 출퇴근 기록을 내 계정으로 옮겨요. 다른 기기에서도 같은 Google 계정으로 로그인하세요.</p>'+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
+  : '<p>로그인 전 연구실은 이 브라우저에서 이어져요. 처음 연결하면 여기에 있는 퀘스트, 복습 카드, 책상 배치, 출퇴근 기록을 내 계정으로 옮겨요. 다른 기기에서도 같은 Google 계정으로 로그인하세요.</p>'+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
  show('내 연구실','계정 동기화',info);
  if($('account-state'))$('account-state').textContent=account.status;
 }

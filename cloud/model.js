@@ -1,10 +1,14 @@
 // Each quest earns one reward. Completing it on two devices still produces one entry.
-export const emptyLab = () => ({version:1,quests:[],attendance:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
+export const emptyLab = () => ({version:1,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 const phase = {ready:1, active:2, done:3};
 export function parts(state) {
   const entries = new Map();
   const extras = {...state.inventory};
   for (const event of state.attendance || []) entries.set('time~'+event.id,event);
+  for (const {attempts, ...card} of state.reviews || []) {
+    entries.set('review~'+card.id,card);
+    for (const turn of attempts) entries.set('grade~'+card.id+'~'+turn.due,turn);
+  }
   for (const quest of state.quests) {
     entries.set('q~'+quest.id, quest);
     if (quest.status === 'done') extras[quest.loot] = (extras[quest.loot] || 0) - 1;
@@ -24,6 +28,11 @@ export function changes(before, after, seed=false) {
 }
 export function compare(a,b) {
   if (!b) return 1;
+  if (a.id.startsWith('grade~')) {
+    // Keep the first day this turn was answered. On a same-day disagreement, schedule another review.
+    if (a.value.day !== b.value.day) return a.value.day < b.value.day ? 1 : -1;
+    if (a.value.correct !== b.value.correct) return a.value.correct ? -1 : 1;
+  }
   if (a.id.startsWith('q~')) {
     const progress = phase[a.value.status]-phase[b.value.status];
     if (progress) return progress;
@@ -32,14 +41,22 @@ export function compare(a,b) {
 }
 export function materialize(rows) {
   const state=emptyLab(), slots=[], gift={...state.inventory};
+  const attempts = new Map();
   for (const row of rows) {
     const {id,value}=row;
+    if (id.startsWith('review~')) state.reviews.push({...value, attempts:[]});
+    if (id.startsWith('grade~')) {
+      const cardId = id.split('~')[1];
+      if (!attempts.has(cardId)) attempts.set(cardId,[]);
+      attempts.get(cardId).push(value);
+    }
     if (id.startsWith('q~')) state.quests.push(value);
     if (id.startsWith('time~')) state.attendance.push(value);
     if (id.startsWith('gift~')) gift[id.slice(5)]=value;
     if (id.startsWith('slot~')) slots[Number(id.slice(5))]=row;
     if (id==='board') Object.assign(state,value);
   }
+  for (const card of state.reviews) card.attempts = attempts.get(card.id) || [];
   state.inventory=gift;
   state.quests.sort((a,b)=>a.created-b.created || a.id.localeCompare(b.id));
   for (const q of state.quests) if(q.status==='done') state.inventory[q.loot]=(state.inventory[q.loot]||0)+1;

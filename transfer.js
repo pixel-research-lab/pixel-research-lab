@@ -8,6 +8,7 @@ const labSave = (() => {
     if (!object(s) || s.version !== 1 || !Array.isArray(s.quests) || !object(s.inventory) ||
         !Array.isArray(s.slots) || s.slots.length !== 3 || !offerIndex(s.offer) ||
         !Array.isArray(s.seenOffers) || !s.seenOffers.every(offerIndex)) return false;
+    if ('reviews' in s && !reviewSchedule.valid(s.reviews)) return false;
     if ('attendance' in s && !attendance.valid(s.attendance)) return false;
     for (const [id, count] of Object.entries(s.inventory)) {
       if (!knownItem(id) || !Number.isSafeInteger(count) || count < 0) return false;

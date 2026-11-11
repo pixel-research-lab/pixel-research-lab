@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
-assets = ['index.html','style.css','data.js','art.js','attendance.js','app.js','transfer.js','offline.js','app.webmanifest','type.woff2','icon-192.png','icon-512.png','OFL.txt','cloud-account.js','cloud-worker.js','visits.js']
+assets = ['index.html','style.css','data.js','art.js','attendance.js','reviews.js','app.js','transfer.js','offline.js','app.webmanifest','type.woff2','icon-192.png','icon-512.png','OFL.txt','cloud-account.js','cloud-worker.js','visits.js']
 template = (root / 'tools' / 'sw.template').read_text()
 digest = hashlib.sha256(template.encode())
 for name in assets:

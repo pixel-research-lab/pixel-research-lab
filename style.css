@@ -31,3 +31,13 @@ dialog{background:var(--paper);border:2px solid var(--deep);border-radius:5px;co
 #shift-log .empty-log{padding-inline:17px}
 @media(max-width:840px){.shift-controls{align-items:flex-end;flex-direction:column;gap:4px}}
 @media(max-width:380px){.attendance{padding:9px}.shift-buttons button{font-size:12px}.shift-entry{gap:6px;margin:0 10px}}
+
+.review-heading{border-top:1px solid var(--line);background:#f6f1df}
+#review-board,#review-records{padding:0 15px}
+.review-row{display:flex;justify-content:space-between;width:100%;align-items:center;text-align:left}
+.review-row>span:first-child{min-width:0}.review-row strong,.upcoming-review p,.review-answer p,.review-guess p{white-space:pre-wrap;overflow-wrap:anywhere}
+.review-empty{color:var(--sub);padding:14px 0 5px;font-size:14px}
+.review-footer{display:flex;align-items:center;justify-content:space-between;color:var(--sub);font-size:12px;padding:7px 0 10px}
+.review-archive{margin-top:18px}.review-answer p,.review-guess p{margin:6px 0}
+.upcoming-review{border-bottom:1px solid var(--soft);padding:9px 0}.upcoming-review:last-of-type{margin-bottom:14px}
+.upcoming-review small,.review-guess small{color:var(--sub)}

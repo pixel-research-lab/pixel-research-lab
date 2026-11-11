@@ -1,7 +1,7 @@
 importScripts('./cloud-worker.js');
 const prefix = 'pixel-research-lab:' + self.registration.scope + ':';
-const cacheName = prefix + '1a756b4667bb422d';
-const assetNames = ["index.html", "style.css", "data.js", "art.js", "attendance.js", "app.js", "transfer.js", "offline.js", "app.webmanifest", "type.woff2", "icon-192.png", "icon-512.png", "OFL.txt", "cloud-account.js", "cloud-worker.js", "visits.js"];
+const cacheName = prefix + '39ba18dd7d9ec159';
+const assetNames = ["index.html", "style.css", "data.js", "art.js", "attendance.js", "reviews.js", "app.js", "transfer.js", "offline.js", "app.webmanifest", "type.woff2", "icon-192.png", "icon-512.png", "OFL.txt", "cloud-account.js", "cloud-worker.js", "visits.js"];
 const urls = assetNames.map(file => new URL(file, self.registration.scope).href);
 const entry = new URL('index.html', self.registration.scope).href;
 const directory = new URL(self.registration.scope);
