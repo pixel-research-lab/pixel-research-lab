@@ -38,7 +38,7 @@ function createPetUI({getState,show,commit,toast}){
   function renderActor(){
     actor.style.left=(animal.x/360*100)+'%';actor.style.top=(animal.y/166*100)+'%';
     bubble.style.left='clamp(min(95px, 28%), '+(animal.x/360*100)+'%, max(calc(100% - 95px), 72%))';
-    bubble.style.top=Math.max(3,(animal.y-33)/166*100)+'%';
+    bubble.style.top=Math.max(3,(animal.y-27)/166*100)+'%';
     if(pose!==animal.mode){
       pose=animal.mode;actor.title=labPets.kinds[id][0]+' · '+labPets.poses[pose];
       actor.setAttribute('aria-label',actor.title+' · 말 걸기');actor.dataset.pose=pose;
@@ -81,11 +81,11 @@ function createPetUI({getState,show,commit,toast}){
   $('pet-change').onclick=()=>{
     let pick=selected();
     show('작업 책상','연구실 반려동물','<div class="pet-grid">'+Object.entries(labPets.kinds).map(([key,[name]])=>
-      '<button type="button" class="pet-card" data-pet="'+key+'"><canvas width="36" height="32" aria-hidden="true"></canvas>'+name+'</button>').join('')+
+      '<button type="button" class="pet-card" data-pet="'+key+'"><canvas width="26" height="18" aria-hidden="true"></canvas>'+name+'</button>').join('')+
       '</div><div class="actions"><button type="button" class="primary" id="adopt-pet">함께 지내기</button><button type="button" class="textbtn" id="no-pet">혼자 지내기</button></div>');
     const cards=document.querySelectorAll('[data-pet]');
     function mark(){for(const b of cards)b.setAttribute('aria-pressed',String(pick===b.dataset.pet));$('adopt-pet').disabled=pick==='none';}
-    for(const b of cards){paintPet(b.querySelector('canvas'),b.dataset.pet,'watch',0,1);b.onclick=()=>{pick=b.dataset.pet;mark();};}mark();
+    for(const b of cards){paintPet(b.querySelector('canvas'),b.dataset.pet,b.dataset.pet==='white'?'rest':'stand',0,-1);b.onclick=()=>{pick=b.dataset.pet;mark();};}mark();
     async function apply(choice){
       const owner=window.pixelAccount.uid,dialog=$('adopt-pet');dialog.disabled=true;
       try{await commit(s=>{s.pet=choice;});if(owner===window.pixelAccount.uid && dialog===$('adopt-pet'))$('modal').close();}

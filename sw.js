@@ -1,6 +1,6 @@
 importScripts('./dist/cloud-worker.js');
 const prefix = 'pixel-research-lab:' + self.registration.scope + ':';
-const cacheName = prefix + '7ddfc93ec396fb72';
+const cacheName = prefix + '6c91a82226aba123';
 const assetNames = ["index.html", "app.webmanifest", "src/app.js", "src/art.js", "src/attendance.js", "src/calendar.js", "src/data.js", "src/material-store.js", "src/material-ui.js", "src/offline.js", "src/pet-art.js", "src/pet-ui.js", "src/pets.js", "src/planner.js", "src/reviews.js", "src/studio-art.js", "src/studio-ui.js", "src/studio.js", "src/transfer.js", "src/visits.js", "assets/fonts/OFL.txt", "assets/fonts/type.woff2", "assets/images/icon-192.png", "assets/images/icon-512.png", "assets/images/items/crab.png", "assets/images/items/floppy.png", "assets/images/items/lens.png", "assets/images/items/mug.png", "assets/images/items/plant.png", "assets/images/items/robot.png", "assets/images/items/scope.png", "assets/images/mascot.png", "assets/images/skills/code.png", "assets/images/skills/design.png", "assets/images/skills/infer.png", "assets/images/skills/read.png", "assets/images/skills/write.png", "assets/styles/calendar.css", "assets/styles/companions.css", "assets/styles/studio.css", "assets/styles/style.css", "dist/cloud-account.js", "dist/cloud-worker.js"];
 const urls = assetNames.map(file => new URL(file, self.registration.scope).href);
 const entry = new URL('index.html', self.registration.scope).href;
