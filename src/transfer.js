@@ -37,17 +37,19 @@ const labSave = (() => {
       if (q.status === 'done' && (!knownItem(q.loot) || !between(q.rankAfter,0,ranks.length-1) ||
           !between(q.rankBefore,0,ranks.length-1) || !Number.isFinite(q.ended))) return false;
     }
-    return studio.valid(s);
+    return studio.valid(s) && labFiles.validMap(s.materials) &&
+      (s.pet===undefined || s.pet==='none' || Object.hasOwn(labPets.kinds,s.pet));
   }
   function read(text) {
-    const record = JSON.parse(text);
+    const record = typeof text==='string'?JSON.parse(text):text;
     const state = record?.format === 'pixel-research-lab' && record.formatVersion === 1 ? record.state : record;
     if (!valid(state)) throw new Error('픽셀 연구실 1단계 세이브 파일인지 확인해 주세요.');
     return state;
   }
-  function download(state) {
+  async function download(state,owner) {
     const date = new Date();
     const data = {format:'pixel-research-lab',formatVersion:1,exportedAt:date.toISOString(),state};
+    if(labFiles.live(state).length)data.originals=await labFiles.archive(state,owner);
     const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
