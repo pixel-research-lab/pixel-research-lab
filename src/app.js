@@ -24,12 +24,12 @@ function qTitle(q){return q.title || q.question}
 function qRow(q,done){return '<button class="'+(done?'journal-row':'quest-row')+'" data-do="'+(done?'record':'quest')+'" data-arg="'+q.id+'">'+sprite(q.track,'skill-icon')+'<span><small>'+escapeHTML(done?new Date(q.ended).toLocaleDateString('ko-KR'):q.status==='ready'?'예측 전':'도전 진행 중')+' · '+tFor(q.track).name+'</small><strong>'+escapeHTML(qTitle(q))+'</strong></span><span class="arrow" aria-hidden="true">›</span></button>'}
 function render(){
  const active=state.quests.filter(q=>q.status!=='done').slice().reverse(),done=state.quests.filter(q=>q.status==='done').sort((a,b)=>b.ended-a.ended);
- const offer=requests[state.offer];$('active-counter').textContent='진행 '+active.length;
+ const offer=requests[state.offer];
  $('field-button').textContent=state.field?'연구 분야 · '+state.field:'연구 분야 설정';
  const suggestion=state.showOffer?
   '<div class="offer"><span class="mini-label">연구실 의뢰</span><h3>'+escapeHTML(offer[0])+'</h3><p>'+escapeHTML(offer[1])+'</p><div class="actions">'+b('의뢰 수락','accept')+b('다른 의뢰 뽑기','reroll','textbtn')+'</div></div>':
-  '<div class="board-empty">'+(!active.length?'<p>진행 중인 퀘스트가 없어요.</p>':'')+b('의뢰 뽑기','reroll','textbtn')+'</div>';
- $('quest-board').innerHTML='<div class="board-inner">'+suggestion+(active.length?'<div class="running-label">내 퀘스트</div>'+active.map(q=>qRow(q,false)).join(''):'')+'</div>';
+  '<div class="board-empty">'+(!active.length?'<p>등록한 연구 퀘스트가 없어요.</p>':'')+b('의뢰 뽑기','reroll','textbtn')+'</div>';
+ $('research-quests').innerHTML='<div class="board-inner">'+suggestion+(active.length?'<div class="running-label">내 퀘스트</div>'+active.map(q=>qRow(q,false)).join(''):'')+'</div>';
  $('skills').innerHTML=tracks.map(t=>{const totals=t.skills.map((_,i)=>stats(t.id,i));const n=totals.filter(s=>s.rank>=2).length, xp=totals.reduce((sum,s)=>sum+s.xp,0);return '<button class="skill-row" data-do="skill" data-arg="'+t.id+'">'+sprite(t.id,'skill-icon')+'<b>'+t.name+'</b><span class="hint">'+t.hint+'</span>'+(xp?'<span class="skill-xp">경험 '+xp+'</span>':'')+'<span class="skill-num">'+n+' / '+t.skills.length+' ›</span></button>'}).join('');
  const ids=Object.keys(lootDefs),owned=ids.filter(i=>state.inventory[i]);$('loot-count').textContent=owned.length+' / '+ids.length+'종';
  $('loot').innerHTML=ids.map(i=>state.inventory[i]?'<button class="loot-cell" data-do="item" data-arg="'+i+'" aria-label="'+lootDefs[i][0]+'">'+sprite(i)+'<small>×'+state.inventory[i]+'</small></button>':'<span class="loot-cell unknown" aria-label="미발견 아이템">?</span>').join('')+'<p class="drawer-note">'+(owned.length===1?'새싹 화분은 입실 선물이에요.':'수집한 아이템을 선택해 책상에 놓으세요.')+'</p>';
@@ -164,17 +164,77 @@ function reviewRow(row,archived=false){
  return '<button class="quest-row review-row" data-do="'+(archived?'review-record':'review')+'" data-arg="'+row.card.id+
   '"><span><small>'+detail+'</small><strong>'+escapeHTML(row.card.question)+'</strong></span><span class="arrow" aria-hidden="true">›</span></button>';
 }
+function dailyDraw(day) {
+ if(state.reviewDraw?.day===day)return state.reviewDraw;
+ // A guest tab can wake at midnight before its storage event is delivered.
+ // Write only the draw into the latest guest save, preserving edits from other tabs.
+ const guest=pixelAccount.uid?null:pixelAccountGuest();
+ const source=guest && labSave.valid(guest)?guest:state;
+ if(source.reviewDraw?.day===day){
+   state.reviewDraw=source.reviewDraw;
+   return state.reviewDraw;
+ }
+ const draw=reviewSchedule.draw(source.reviews||[],day,source.reviewLimit??reviewSchedule.defaultLimit);
+ if(draw.ids.length && (!source.reviewDraw || source.reviewDraw.day<day)){
+   draw.createdAt=Date.now();
+   state.reviewDraw=draw;
+   if(pixelAccount.uid)save();
+   else{
+     try{localStorage.setItem(key,JSON.stringify({...source,reviewDraw:draw}));}
+     catch{loaded=false;$('save-state').textContent='현재 창에만 저장';}
+   }
+ }
+ return draw;
+}
+function dailyReviews(day, rows=reviewRows()){
+ const draw=dailyDraw(day), byId=new Map(rows.map(row=>[row.card.id,row]));
+ const selected=draw.ids.map(id=>byId.get(id)).filter(Boolean);
+ return {selected, remaining:selected.filter(row=>row.due && row.due<=day)};
+}
 function paintReviews(day){
- const rows=reviewRows(), due=rows.filter(r=>r.due && r.due<=day), upcoming=rows.filter(r=>r.due>day);
+ const rows=reviewRows(), {selected,remaining}=dailyReviews(day,rows);
+ const upcoming=rows.filter(r=>r.due>day);
  const archived=rows.filter(r=>r.finished).sort((a,b)=>b.finished.localeCompare(a.finished));
- const empty=upcoming.length?'다음 복습은 '+reviewDate(upcoming[0].due)+'이에요.':
+ const progress=selected.length ? (selected.length-remaining.length)+' / '+selected.length+' 완료' : '';
+ const empty=selected.length?'오늘 뽑힌 복습을 모두 풀었어요.':upcoming.length?'다음 복습은 '+reviewDate(upcoming[0].due)+'이에요.':
   rows.length?'오늘 풀 복습이 없어요.':'질문과 답을 등록하면 내일부터 복습할 수 있어요.';
- $('review-board').innerHTML=(due.length?due.map(r=>reviewRow(r)).join(''):'<p class="review-empty">'+empty+'</p>')+
-  '<div class="review-footer"><span>복습 XP '+rows.reduce((sum,r)=>sum+r.xp,0)+'</span>'+
-  (upcoming.length?b('복습 예정 '+upcoming.length+'개','upcoming','textbtn'):'')+'</div>';
+ $('daily-review-quests').innerHTML='<div class="running-label daily-heading">복습 퀘스트 <span>'+progress+'</span></div>'+
+   (remaining.length?remaining.map(r=>reviewRow(r)).join(''):'<p class="review-empty">'+empty+'</p>');
+ const active=state.quests.filter(q=>q.status!=='done').length;
+ $('active-counter').textContent='진행 '+(active+remaining.length);
+ const limit=state.reviewLimit??reviewSchedule.defaultLimit;
+ $('review-board').innerHTML='<div class="review-footer"><span>복습 XP '+rows.reduce((sum,r)=>sum+r.xp,0)+'</span>'+
+   b('하루 '+limit+'문제 · 설정','review-settings','textbtn')+
+   (upcoming.length?b('복습 예정 '+upcoming.length+'개','upcoming','textbtn'):'')+'</div>';
  $('review-count').textContent=archived.length+'건';
  $('review-records').innerHTML=archived.length?archived.map(r=>reviewRow(r,true)).join(''):
   '<div class="empty-log">네 번 연속 맞힌 질문이 여기에 남아요.</div>';
+}
+function reviewSettings(){
+ const limit=state.reviewLimit??reviewSchedule.defaultLimit;
+ show('복습 관리','하루 복습 문항 수','<form id="review-settings-form"><label class="field">하루 최대 문항 수'+
+   '<input type="number" id="review-limit" min="1" max="'+reviewSchedule.maxLimit+'" step="1" required value="'+limit+'"></label>'+
+   '<p class="muteline">새로 뽑는 목록부터 적용해요. 복습할 문제가 더 적으면 모두 나와요.</p>'+
+   '<button class="primary" type="submit">저장</button></form>');
+ const form=$('review-settings-form'), input=$('review-limit');
+ form.onsubmit=async e=>{
+   e.preventDefault();
+   const value=input.valueAsNumber;
+   if(!reviewSchedule.validLimit(value))return;
+   refreshGuestForReview();
+   const previous=state.reviewLimit, owner=pixelAccount.uid, button=form.querySelector('button');
+   state.reviewLimit=value;button.disabled=true;
+   try{
+     if(!await save(true))throw Error('storage');
+     if(owner===pixelAccount.uid && form===$('review-settings-form')){modal.close();toast('복습 문항 수를 저장했어요.');}
+   }catch{
+     if(owner===pixelAccount.uid){
+       if(previous===undefined)delete state.reviewLimit;else state.reviewLimit=previous;
+       toast('문항 수를 저장하지 못했어요. 다시 시도해 주세요.');
+     }
+   }finally{button.disabled=false;render();}
+ };
+ input.focus();
 }
 function upcomingReviews(){
  const rows=reviewRows().filter(r=>r.due>reviewSchedule.today());
@@ -187,9 +247,9 @@ function refreshGuestForReview(){
  if(latest && labSave.valid(latest))state=latest;
 }
 function newReview(){
- show('오늘의 복습','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 이 실험에서 대조군을 둔 이유는 무엇일까?"></textarea></label>'+
+ show('복습 관리','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 이 실험에서 대조군을 둔 이유는 무엇일까?"></textarea></label>'+
   '<label class="field">기억하고 싶은 답<textarea id="review-answer" required maxlength="4000"></textarea></label>'+
-  '<p class="muteline">첫 복습은 내일이에요. 복습할 때는 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
+  '<p class="muteline">내일부터 오늘의 퀘스트 추첨에 들어가요. 문제를 열면 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
  const form=$('review-form');
  form.oninput=e=>e.target.setCustomValidity('');
  form.onsubmit=async e=>{
@@ -205,7 +265,7 @@ function newReview(){
   try{
    if(!await save(true))throw Error('storage');
    if(pixelAccount.uid===owner && form===$('review-form') && modal.open){
-    modal.close();toast('저장했어요. 첫 복습은 '+reviewDate(card.firstDue)+'이에요.');
+    modal.close();toast(reviewDate(card.firstDue)+'부터 복습 퀘스트로 뽑힐 수 있어요.');
    }
   }catch{
    if(pixelAccount.uid===owner){state.reviews=(state.reviews||[]).filter(c=>c.id!==card.id);toast('카드를 저장하지 못했어요. 다시 눌러 주세요.');}
@@ -217,15 +277,17 @@ function openReview(id){
  const card=reviewById(id);if(!card)return;
  const {due,streak,finished}=reviewSchedule.progress(card);
  if(finished){reviewRecord(id);return;}
- if(due>reviewSchedule.today()){upcomingReviews();return;}
+ const day=reviewSchedule.today();
+ if(!dailyDraw(day).ids.includes(id) || due>day){render();return;}
  show('오늘의 복습 · '+streak+' / 4 연속 정답',card.question,'<label class="field">떠올린 답 <small>(선택)</small><textarea id="recall" maxlength="4000" placeholder="말로 떠올리거나 여기에 적어 보세요."></textarea></label>'+
   '<div class="actions">'+b('답 확인','compare-review','primary')+b('모르겠다','grade-no')+'</div>');
- currentReview={id,due};
+ currentReview={id,due,day};
 }
 function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span><p>'+escapeHTML(card.answer)+'</p></div>';}
 function currentTurn(){
  const round=currentReview,card=round && reviewById(round.id);
- if(!card || reviewSchedule.progress(card).due!==round.due || round.due>reviewSchedule.today()){
+ const day=reviewSchedule.today();
+ if(!card || round.day!==day || !dailyDraw(day).ids.includes(round.id) || reviewSchedule.progress(card).due!==round.due){
   if(modal.open)modal.close();render();toast('복습 일정이 바뀌었어요. 오늘의 복습을 확인해 주세요.');return null;
  }
  return {round,card};
@@ -252,7 +314,7 @@ async function gradeReview(correct){
   if(owner!==pixelAccount.uid || !modal.open || currentReview!==round)return;
   const saved=reviewById(card.id),after=saved && reviewSchedule.progress(saved);
   if(!after){modal.close();return;}
-  const next=reviewRows().find(r=>r.due && r.due<=reviewSchedule.today());
+  const [next]=dailyReviews(reviewSchedule.today()).remaining;
   const delta=after.xp-before.xp, heading=after.finished?'복습 완료 · 4회 연속 정답':after.streak?'연속 정답 '+after.streak+' / 4':'다시 복습';
   show(heading,card.question,answerBlock(saved)+'<p class="skill-result">'+
    (after.finished?'연구 일지의 완료한 복습에 남겼어요.':'다음 복습 · '+reviewDate(after.due))+
@@ -360,6 +422,7 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
  case 'new-review':newReview();break;
+ case 'review-settings':reviewSettings();break;
  case 'review':openReview(arg);break;
  case 'upcoming':upcomingReviews();break;
  case 'compare-review':compareReview();break;

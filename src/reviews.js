@@ -15,6 +15,18 @@ const reviewSchedule = (() => {
     const date = new Date(day + 'T00:00:00Z');
     return Number.isFinite(date.getTime()) && date.toISOString().slice(0,10) === day;
   }
+  const defaultLimit = 6;
+  // One saved draw must fit the sync record's 100,000-character JSON limit
+  // even when every imported card ID has the maximum length (100).
+  const maxLimit = 970;
+  function validLimit(value) {
+    return Number.isSafeInteger(value) && value >= 1 && value <= maxLimit;
+  }
+  function validDraw(draw) {
+    return draw && Number.isSafeInteger(draw.createdAt) && draw.createdAt > 0 && validDay(draw.day) && Array.isArray(draw.ids) && validLimit(draw.ids.length) &&
+      draw.ids.every(id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id)) &&
+      new Set(draw.ids).size === draw.ids.length;
+  }
   function valid(cards) {
     if (!Array.isArray(cards)) return false;
     const ids = new Set();
@@ -33,14 +45,16 @@ const reviewSchedule = (() => {
     }
     return true;
   }
-  function progress(card) {
+  function progress(card, beforeDay) {
     // Replaying actual study days keeps later offline practice when the two devices'
     // schedules diverged. A second answer on the same day cannot advance the streak.
     const turns = [...card.attempts].sort((a,b)=>a.day.localeCompare(b.day) ||
       Number(a.correct)-Number(b.correct) || a.due.localeCompare(b.due));
-    let due = card.firstDue, streak = 0, xp = 0, finished = null;
+    let due = card.firstDue, streak = 0, xp = 0, finished = null, retry = false;
     for (const attempt of turns) {
+      if (beforeDay && attempt.day >= beforeDay) break;
       if (attempt.day < due) continue;
+      retry = !attempt.correct;
       if (attempt.correct) {
         streak++;
         xp = Math.max(xp, streak * 10);
@@ -51,7 +65,31 @@ const reviewSchedule = (() => {
       if (streak === 4) { finished = attempt.day; due = null; break; }
       due = addDays(attempt.day, intervals[streak]);
     }
-    return {due, streak, xp, finished};
+    return {due, streak, xp, finished, retry};
   }
-  return {today, addDays, valid, progress};
+  function dailyRandom(day, id) {
+    // The same dated card gets the same uniform score regardless of device or input order.
+    let hash = 2166136261;
+    for (const char of day + '/' + id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+    hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+    return (((hash ^ (hash >>> 16)) >>> 0) + 1) / 4294967297;
+  }
+  function draw(cards, day, limit) {
+    const candidates = [];
+    const dayTime = Date.parse(day);
+    for (const card of cards) {
+      // Today's answers count toward completion, never toward selecting replacements.
+      const {due, retry} = progress(card, day);
+      if (!due || due > day) continue;
+      const overdueDays = (dayTime - Date.parse(due)) / 86400000;
+      const score = -Math.log(dailyRandom(day, card.id)) / (1 + Math.sqrt(overdueDays));
+      candidates.push({id:card.id, retry, due, score});
+    }
+    candidates.sort((a,b) => Number(b.retry) - Number(a.retry) ||
+      (a.retry && b.retry ? a.due.localeCompare(b.due) : 0) ||
+      a.score - b.score || (a.id < b.id ? -1 : Number(a.id > b.id)));
+    return {day, ids:candidates.slice(0, limit).map(card => card.id)};
+  }
+  return {today, addDays, valid, progress, defaultLimit, maxLimit, validLimit, validDraw, draw};
 })();
