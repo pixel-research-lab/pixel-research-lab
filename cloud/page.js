@@ -1,4 +1,5 @@
 import {auth,login,signOut,onAuthStateChanged,listen,flush} from './firebase.js';
+import {GoogleAuthProvider, reauthenticateWithPopup} from 'firebase/auth';
 import {emptyLab,changes,materialize} from './model.js';
 import {rows,update} from './local.js';
 const actor=crypto.randomUUID();
@@ -117,6 +118,19 @@ window.pixelAccount={
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake();else if(uid)requestBackground();});
     if(channel) channel.onmessage=e=>{if(uid&&e.data===uid)wake();};
     navigator.serviceWorker?.addEventListener('message',e=>{if(e.data==='pixel-lab-sent')wake();});
+  },
+  async calendarAccess(write=false){
+    const user=auth.currentUser;
+    if(!user || user.uid!==uid)throw Error('login-required');
+    const provider=new GoogleAuthProvider();
+    const scope='https://www.googleapis.com/auth/';
+    provider.addScope(scope+'calendar.calendarlist.readonly');
+    provider.addScope(scope+(write?'calendar.events':'calendar.events.readonly'));
+    provider.setCustomParameters({login_hint:user.email,prompt:'consent'});
+    const result=await reauthenticateWithPopup(user,provider);
+    const token=GoogleAuthProvider.credentialFromResult(result)?.accessToken;
+    if(!token || auth.currentUser?.uid!==user.uid)throw Error('calendar-access');
+    return {token,uid:user.uid,write};
   },
   edit, get uid(){return uid;}, get email(){return auth.currentUser?.email;}, get status(){return message();},
   async login(includeGuest=false){

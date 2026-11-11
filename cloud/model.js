@@ -4,6 +4,10 @@ const phase = {ready:1, active:2, done:3};
 export function parts(state) {
   const entries = new Map();
   const extras = {...state.inventory};
+  if (state.calendarChoice !== undefined) entries.set('calendarChoice',state.calendarChoice);
+  for (const event of state.agendaEvents || []) entries.set('agenda~'+event.key,event);
+  for (const [key,done] of Object.entries(state.agendaDone || {})) entries.set('done~'+key,done);
+  for (const [key,star] of Object.entries(state.agendaStars || {})) entries.set('star~'+key,star);
   if (state.reviewLimit !== undefined) entries.set('reviewLimit', state.reviewLimit);
   if (state.reviewDraw) entries.set('reviewDraw', state.reviewDraw);
   for (const event of state.attendance || []) entries.set('time~'+event.id,event);
@@ -31,6 +35,8 @@ export function changes(before, after, seed=false) {
 }
 export function compare(a,b) {
   if (!b) return 1;
+  if (a.id.startsWith('agenda~g-') && a.value.updated !== b.value.updated)
+    return (a.value.updated || 0) - (b.value.updated || 0);
   if (a.id === 'reviewDraw') {
     // Keep the newest study day; within it the first draw wins across offline devices.
     if (a.value.day !== b.value.day) return a.value.day > b.value.day ? 1 : -1;
@@ -63,6 +69,10 @@ export function materialize(rows) {
     if (id.startsWith('time~')) state.attendance.push(value);
     if (id.startsWith('gift~')) gift[id.slice(5)]=value;
     if (id.startsWith('slot~')) slots[Number(id.slice(5))]=row;
+    if (id === 'calendarChoice') state.calendarChoice = value;
+    if (id.startsWith('agenda~')) (state.agendaEvents ??= []).push(value);
+    if (id.startsWith('done~')) (state.agendaDone ??= {})[id.slice(5)] = value;
+    if (id.startsWith('star~')) (state.agendaStars ??= {})[id.slice(5)] = value;
     if (id === 'reviewLimit') state.reviewLimit = value;
     if (id === 'reviewDraw') state.reviewDraw = value;
     if (id==='field') state.field=value;

@@ -4,7 +4,7 @@ service cloud.firestore {
     match /players/{uid}/records/{id} {
       allow get, list: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && id.matches('q~[a-zA-Z0-9_-]+|time~[a-zA-Z0-9_-]{1,100}|review~[a-zA-Z0-9_-]{1,100}|grade~[a-zA-Z0-9_-]{1,100}~[0-9]{4}-[0-9]{2}-[0-9]{2}|slot~[0-2]|gift~[a-zA-Z0-9_-]+|board|field|reviewLimit|reviewDraw')
+        && id.matches('q~[a-zA-Z0-9_-]+|time~[a-zA-Z0-9_-]{1,100}|review~[a-zA-Z0-9_-]{1,100}|grade~[a-zA-Z0-9_-]{1,100}~[0-9]{4}-[0-9]{2}-[0-9]{2}|slot~[0-2]|gift~[a-zA-Z0-9_-]+|board|field|reviewLimit|reviewDraw|calendarChoice|(agenda|done|star)~(l-[0-9a-f-]{36}|g-[0-9a-f]{64})')
         && request.resource.data.keys().hasAll(['clock','actor','json'])
         && request.resource.data.keys().hasOnly(['clock','actor','json'])
         && request.resource.data.clock is int && request.resource.data.clock > 0
