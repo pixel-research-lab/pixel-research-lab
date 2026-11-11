@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /players/{uid}/records/{id} {
+      allow get, list: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && id.matches('q~[a-zA-Z0-9_-]+|slot~[0-2]|gift~[a-zA-Z0-9_-]+|board')
+        && request.resource.data.keys().hasAll(['clock','actor','json'])
+        && request.resource.data.keys().hasOnly(['clock','actor','json'])
+        && request.resource.data.clock is int && request.resource.data.clock > 0
+        && request.resource.data.actor is string && request.resource.data.actor.size() <= 100
+        && request.resource.data.json is string && request.resource.data.json.size() <= 100000;
+    }
+  }
+}

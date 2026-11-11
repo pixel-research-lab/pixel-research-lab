@@ -8,6 +8,7 @@ const blank=()=>({version:1,quests:[],inventory:{plant:1},slots:['plant',null,nu
 let state=blank(), loaded=true, toastTimer, selectedLoot=null, home=true;
 try {const s=JSON.parse(localStorage.getItem(key)||'null');if(s && labSave.valid(s))state=s;}catch{loaded=false}
 function save(){
+ if(window.pixelAccount?.edit(state))return;
  try{localStorage.setItem(key,JSON.stringify(state));$('save-state').textContent='이 브라우저에 저장';loaded=true;}
  catch{loaded=false;$('save-state').textContent='현재 창에만 저장';}
 }
@@ -94,8 +95,8 @@ function summary(s) {
 }
 function savePanel(message='') {
   pendingImport = null;
-  const previous = storedValue(previousKey);
-  const webLink = localDemo ? '<p class="save-guide">이 파일에서 세이브를 내보낸 뒤, <a href="https://2e2guk.github.io/pixel-research-lab/" target="_blank" rel="noopener">배포된 연구실 열기 ↗</a>에서 가져오세요.</p>' : '<p class="save-guide">다른 기기로 옮기려면 여기서 파일을 내보낸 뒤 그 기기에서 가져오세요.</p>';
+  const previous = !pixelAccount.uid && storedValue(previousKey);
+  const webLink = localDemo ? '<p class="save-guide">이 파일에서 세이브를 내보낸 뒤, <a href="https://2e2guk.github.io/pixel-research-lab/" target="_blank" rel="noopener">배포된 연구실 열기 ↗</a>에서 가져오세요.</p>' : (pixelAccount.uid ? '<p class="save-guide">같은 계정의 다른 기기와 자동 동기화됩니다. 파일로도 백업할 수 있어요.</p>' : '<p class="save-guide">로그인하면 같은 계정의 기기에서 이어 할 수 있어요.</p>'+b('계정 연결','account'));
   show('내 연구실','세이브 관리',summary(state)+webLink+
     '<div class="actions">'+b('세이브 내보내기','export-save','primary')+b('세이브 가져오기','choose-save')+'</div>'+
     '<input type="file" id="save-file" hidden accept=".json,application/json">'+
@@ -111,12 +112,15 @@ function savePanel(message='') {
 function previewImport(next, restoring) {
   pendingImport = {next, base:storedValue(key)};
   show('세이브 관리',restoring?'이전 연구실로 돌아갈까요?':'이 세이브를 불러올까요?',
-    summary(next)+'<p>현재 퀘스트와 책상 배치가 이 기록으로 바뀝니다. 적용 전 상태도 이 브라우저에 보관해요.</p><div class="actions">'+
+    summary(next)+(pixelAccount.uid?'<p>계정의 퀘스트와 합치고 파일의 책상 배치를 적용해요. 이미 완료한 퀘스트는 유지합니다.</p>':'<p>현재 퀘스트와 책상 배치가 이 기록으로 바뀝니다. 적용 전 상태도 이 브라우저에 보관해요.</p>')+'<div class="actions">'+
     b('적용하기','apply-save','primary')+b('취소','save-panel')+'</div>');
 }
 function applyImport() {
   if (!pendingImport) return;
   const {next,base} = pendingImport;
+  if(pixelAccount.uid){
+    pixelAccount.edit(next,true); pendingImport=null;changeTab(true);toast('계정 기록과 합치는 중이에요.');return;
+  }
   if (storedValue(key) !== base) {savePanel('다른 탭에서 기록이 변경됐어요. 파일을 다시 선택해 주세요.');return;}
   try {
     localStorage.setItem(previousKey, JSON.stringify(state));
@@ -134,6 +138,10 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
  save();render();desk();toast(lootDefs[id][0]+' 배치 완료');}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
+ case 'account':accountPanel();break;
+ case 'sign-in':pixelAccount.login().catch(e=>{const field=$('auth-feedback');if(field)field.textContent=e.code==='auth/popup-closed-by-user'?'로그인 창이 닫혔어요.':'로그인을 마치지 못했어요. 인터넷 연결과 팝업 허용을 확인해 주세요.';});break;
+ case 'sign-out':pixelAccount.logout().catch(()=>toast('로그아웃을 완료하지 못했어요.'));break;
+ case 'sync-now':pixelAccount.retry();break;
  case 'save-panel':savePanel();break;
  case 'export-save':labSave.download(state);$('transfer-info').textContent='세이브 파일을 내보냈어요.';break;
  case 'choose-save':$('save-file').click();break;
@@ -151,9 +159,40 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
 $('home-tab').onclick=()=>changeTab(true);$('journal-tab').onclick=()=>changeTab(false);
 $('close-modal').onclick=()=>modal.close();modal.addEventListener('close',()=>{removeMode=false;});
 window.addEventListener('storage',e=>{
- if(e.key!==key||!e.newValue)return;
+ if(pixelAccount.uid || e.key!==key||!e.newValue)return;
  try{const updated=JSON.parse(e.newValue);if(!labSave.valid(updated))return;
  state=updated;if(modal.open){modal.close();toast('다른 탭에서 저장한 내용을 불러왔어요.');}render();}catch{}
+});
+function accountPanel(){
+ const account=pixelAccount;
+ const info=account.uid
+  ? '<p>'+escapeHTML(account.email||'연결된 계정')+'</p><p id="account-state"></p><div class="actions">'+b('지금 동기화','sync-now')+b('로그아웃','sign-out','textbtn')+'</div><p class="save-guide">'+('SyncManager' in window?'탭을 닫은 뒤에는 브라우저가 허용할 때 대기 기록을 보내요.':'오프라인에서 창을 닫았다면 인터넷에 연결한 뒤 연구실을 다시 열어 주세요.')+'</p>'
+  : '<p>이 기기의 퀘스트와 책상 배치를 내 계정에 연결해요. 다른 기기에서도 같은 Google 계정으로 로그인하세요.</p>'+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
+ show('내 연구실','계정 동기화',info);
+ if($('account-state'))$('account-state').textContent=account.status;
+}
+function redraw(next){
+ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ const oldById=new Map(state.quests.map(q=>[q.id,q]));
+ let currentChanged=false;
+ next.quests=next.quests.map(q=>{
+   const previous=oldById.get(q.id);
+   if(!previous)return q;
+   if(same(previous,q))return previous;
+   if(modal.open && $('dialog-name')?.textContent===qTitle(previous))currentChanged=true;
+   return q;
+ });
+ if(currentChanged){modal.close();toast('다른 기기의 퀘스트 기록을 반영했어요.');}
+ state=next;render();
+}
+pixelAccount.init({
+ readGuest:()=>{try{return JSON.parse(localStorage.getItem(key));}catch{return null;}},
+ claimGuest: guest=>{if(storedValue(key)===JSON.stringify(guest)){localStorage.removeItem(key);localStorage.removeItem(previousKey);}},
+ guest:()=>{let g;try{g=JSON.parse(storedValue(key));}catch{}redraw(g&&labSave.valid(g)?g:blank());},
+ busy:v=>{document.querySelector('main').inert=v;document.querySelector('header').inert=v;},
+ closeAccount:()=>{if(modal.open)modal.close();},
+ apply:redraw,alert:toast,
+ status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });
 if(!loaded)$('save-state').textContent='현재 창에만 저장';logo();render();
 })();

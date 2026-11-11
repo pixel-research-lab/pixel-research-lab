@@ -1,6 +1,7 @@
+importScripts('./cloud-worker.js');
 const prefix = 'pixel-research-lab:' + self.registration.scope + ':';
-const cacheName = prefix + '06b3e04446ce1760';
-const assetNames = ["index.html", "style.css", "data.js", "art.js", "app.js", "transfer.js", "offline.js", "app.webmanifest", "type.woff2", "icon-192.png", "icon-512.png", "OFL.txt"];
+const cacheName = prefix + '61497b78d7533550';
+const assetNames = ["index.html", "style.css", "data.js", "art.js", "app.js", "transfer.js", "offline.js", "app.webmanifest", "type.woff2", "icon-192.png", "icon-512.png", "OFL.txt", "cloud-account.js", "cloud-worker.js", "visits.js"];
 const urls = assetNames.map(file => new URL(file, self.registration.scope).href);
 const entry = new URL('index.html', self.registration.scope).href;
 const directory = new URL(self.registration.scope);
@@ -32,5 +33,13 @@ self.addEventListener('fetch', event => {
     const cache = await caches.open(cacheName);
     const saved = await cache.match(isEntry ? entry : path);
     return saved || fetch(event.request);
+  })());
+});
+
+self.addEventListener('sync', event => {
+  if(event.tag !== 'pixel-lab-upload') return;
+  event.waitUntil((async()=>{
+    await self.flushPixelResearchLab();
+    for(const client of await self.clients.matchAll({type:'window'})) client.postMessage('pixel-lab-sent');
   })());
 });

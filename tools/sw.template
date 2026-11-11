@@ -1,3 +1,4 @@
+importScripts('./cloud-worker.js');
 const prefix = 'pixel-research-lab:' + self.registration.scope + ':';
 const cacheName = prefix + 'BUILD_HASH';
 const assetNames = ASSET_LIST;
@@ -32,5 +33,13 @@ self.addEventListener('fetch', event => {
     const cache = await caches.open(cacheName);
     const saved = await cache.match(isEntry ? entry : path);
     return saved || fetch(event.request);
+  })());
+});
+
+self.addEventListener('sync', event => {
+  if(event.tag !== 'pixel-lab-upload') return;
+  event.waitUntil((async()=>{
+    await self.flushPixelResearchLab();
+    for(const client of await self.clients.matchAll({type:'window'})) client.postMessage('pixel-lab-sent');
   })());
 });
