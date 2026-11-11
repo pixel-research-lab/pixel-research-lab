@@ -2,6 +2,7 @@ import {auth,login,signOut,onAuthStateChanged,listen,flush} from './firebase.js'
 import {GoogleAuthProvider, reauthenticateWithPopup} from 'firebase/auth';
 import {emptyLab,changes,materialize} from './model.js';
 import {rows,update} from './local.js';
+import {fetchAttachment} from './transport.js';
 const actor=crypto.randomUUID();
 const clone = v => JSON.parse(JSON.stringify(v));
 const channel = typeof BroadcastChannel==='function' ? new BroadcastChannel('pixel-lab.records.v2') : null;
@@ -132,13 +133,15 @@ window.pixelAccount={
     if(!token || auth.currentUser?.uid!==user.uid)throw Error('calendar-access');
     return {token,uid:user.uid,write};
   },
-  edit, get uid(){return uid;}, get email(){return auth.currentUser?.email;}, get status(){return message();},
+  fetchFile:fetchAttachment,edit, get uid(){return uid;}, get email(){return auth.currentUser?.email;}, get status(){return message();},
   async login(includeGuest=false){
     const guest=includeGuest?hooks.readGuest():null;
     const {user}=await login();
     if(!guest || !labSave.valid(guest) || auth.currentUser?.uid!==user.uid)return;
     // Bind the opt-in to the account actually chosen in this popup, including across tabs.
     await queue(async()=>{
+      await hooks.copyGuestFiles(guest,user.uid);
+      if(auth.currentUser?.uid!==user.uid)return;
       await update(user.uid,changes(emptyLab(),guest,true),'local',actor,true);
       hooks.claimGuest(guest);
       channel?.postMessage(user.uid);

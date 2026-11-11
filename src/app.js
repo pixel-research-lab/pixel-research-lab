@@ -37,7 +37,7 @@ function render(){
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- studioUI.paint();reviewDay=null;resetClockView();
+ materials.paint();studioUI.paint();reviewDay=null;resetClockView();
 }
 let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
 let writingShift=false;
@@ -54,11 +54,11 @@ function updateClock(){
  const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
  const day=reviewSchedule.today(date);
  if(reviewDay!==day){paintReviews(day);reviewDay=day;}
- if(home && paintedMinute!==minute){paintRoom(state.slots,date,studio.wallet(state).fitted);paintedMinute=minute;}
+ if(home && paintedMinute!==minute){paintRoom(state.slots,date,studio.wallet(state).fitted);paintedMinute=minute;petUI.refresh(date,studyDay,dailyReviews(day).remaining.length);}
  if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
  const second=Math.floor(now/1000);
  if(recordedSecond===second)return;
- recordedSecond=second;
+ recordedSecond=second;petUI.tick();
  $('study-total').textContent=attendance.duration(attendance.dayTotal(studyDay,date,now));
  const last=studyDay.accepted.at(-1);
  const status=studyDay.status, [action,label]=shiftActions[status];
@@ -122,7 +122,7 @@ function changeTab(isHome){home=isHome;if(modal.open)modal.close();render();wind
 function show(context,title,body){
  currentReview=null;
  $('dialog-context').textContent=context;$('modal-body').innerHTML='<div class="modal-content"><h2 id="dialog-name">'+escapeHTML(title)+'</h2>'+body+'</div>';
- modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;
+ materials.paint($('modal-body'));modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;
 }
 function fieldForm(){
  show('내 연구실','연구 분야 설정','<form id="field-form"><label class="field">연구 분야<input type="text" id="field-name" maxlength="60" placeholder="예: 천문학, 생태학, VLM" value="'+escapeHTML(state.field||'')+'"></label><button class="primary" type="submit">저장</button></form>');
@@ -145,14 +145,26 @@ function takeOffer(){if(!state.showOffer){state.showOffer=true;state.offer=choos
 }
 function make(question,track,skill,title='',focusSkill=studio.axes(state).find(x=>x.visible&&x.base===track)?.id||null,difficulty='standard'){
  const id=crypto.randomUUID?.()||Date.now().toString(36)+'-'+rng(100000);
- const q={id,question,track,skill,title,focusSkill,difficulty,status:'ready',created:Date.now()};state.quests.push(q);return q;
+ const q={id,question,track,skill,title,focusSkill,difficulty,status:'ready',created:Date.now()};return q;
 }
 function newForm(){
- show(state.field||'퀘스트 보드','새 퀘스트','<form id="register-form"><label class="field">알아내고 싶은 질문<textarea id="question" maxlength="260" required placeholder="예: 비교 조건 하나를 바꾸면 관찰 결과도 달라질까?"></textarea></label><label class="field">키울 스킬<select id="track">'+studioUI.optionList()+'</select></label><label class="field">연습 항목<select id="skill"></select></label><label class="field">난이도 · 완료 보상<select id="difficulty"><option value="easy">가벼움 · 15 token</option><option value="standard" selected>보통 · 30 token</option><option value="hard">도전 · 60 token</option></select></label><button class="primary" type="submit">질문 등록</button></form>');
+ show(state.field||'퀘스트 보드','새 퀘스트','<form id="register-form"><label class="field">알아내고 싶은 질문<textarea id="question" maxlength="260" required placeholder="예: 비교 조건 하나를 바꾸면 관찰 결과도 달라질까?"></textarea></label><label class="field">키울 스킬<select id="track">'+studioUI.optionList()+'</select></label><label class="field">연습 항목<select id="skill"></select></label><label class="field">난이도 · 완료 보상<select id="difficulty"><option value="easy">가벼움 · 15 token</option><option value="standard" selected>보통 · 30 token</option><option value="hard">도전 · 60 token</option></select></label>'+materials.picker('quest')+'<button class="primary" type="submit">질문 등록</button></form>');
  const base=()=>studio.axes(state).find(x=>x.id===$('track').value)?.base || 'read';
  const options=()=>{$('skill').innerHTML=tFor(base()).skills.map((s,i)=>'<option value="'+i+'">'+s+'</option>').join('')};options();$('track').onchange=options;
  $('register-form').onsubmit=e=>{e.preventDefault();const field=$('question');if(!field.value.trim()){field.setCustomValidity('질문을 입력해 주세요.');field.reportValidity();return;}
- const q=make(field.value.trim(),base(),Number($('skill').value),'',$('track').value||null,$('difficulty').value);save();render();quest(q.id);};$('question').oninput=e=>e.target.setCustomValidity('');$('question').focus();
+ const q=make(field.value.trim(),base(),Number($('skill').value),'',$('track').value||null,$('difficulty').value);saveWithFiles(e.currentTarget,q.id,s=>{s.quests=[...s.quests,q];},()=>quest(q.id));};$('question').oninput=e=>e.target.setCustomValidity('');$('question').focus();
+}
+async function saveWithFiles(form,parent,change,after){
+ const button=form.querySelector('[type="submit"]');
+ if(button.disabled)return;
+ const identity=fileOwner();button.disabled=true;
+ try{
+   const refs=await materials.collect(form,parent,identity);
+   if(identity!==fileOwner() || !modal.open || !form.isConnected)return;
+   await commit(s=>{change(s);materials.attach(s,refs);});
+   if(identity===fileOwner() && modal.open && form.isConnected)after();
+ }catch(err){if(identity===fileOwner())toast(err.message||'기기에 저장하지 못했어요.');}
+ finally{button.disabled=false;}
 }
 let currentReview=null, savingReview=false;
 function reviewById(id){return (state.reviews||[]).find(card=>card.id===id);}
@@ -206,7 +218,7 @@ function paintReviews(day){
  planner.paint(day,active+remaining.length);
  const limit=state.reviewLimit??reviewSchedule.defaultLimit;
  $('review-board').innerHTML='<div class="review-footer"><span>복습 XP '+rows.reduce((sum,r)=>sum+r.xp,0)+'</span>'+
-   b('하루 '+limit+'문제 · 설정','review-settings','textbtn')+
+   (rows.length?b('복습 자료 관리','review-files','textbtn'):'')+b('하루 '+limit+'문제 · 설정','review-settings','textbtn')+
    (upcoming.length?b('복습 예정 '+upcoming.length+'개','upcoming','textbtn'):'')+'</div>';
  $('review-count').textContent=archived.length+'건';
  $('review-records').innerHTML=archived.length?archived.map(r=>reviewRow(r,true)).join(''):
@@ -250,8 +262,8 @@ function refreshGuestForReview(){
 }
 function newReview(){
  show('복습 관리','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 이 실험에서 대조군을 둔 이유는 무엇일까?"></textarea></label>'+
-  '<label class="field">기억하고 싶은 답<textarea id="review-answer" required maxlength="4000"></textarea></label>'+
-  '<label class="field">연결할 스킬<select id="review-focus">'+studioUI.optionList('',true)+'</select></label>'+
+  materials.picker('prompt')+'<label class="field">기억하고 싶은 답<textarea id="review-answer" required maxlength="4000"></textarea></label>'+
+  materials.picker('answer')+'<label class="field">연결할 스킬<select id="review-focus">'+studioUI.optionList('',true)+'</select></label>'+
   '<p class="muteline">내일부터 오늘의 퀘스트 추첨에 들어가요. 문제를 열면 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
  const form=$('review-form');
  form.oninput=e=>e.target.setCustomValidity('');
@@ -262,17 +274,9 @@ function newReview(){
   }
   const card={id:crypto.randomUUID(),question:$('review-question').value.trim(),answer:$('review-answer').value.trim(),
     focusSkill:$('review-focus').value||null,firstDue:reviewSchedule.addDays(reviewSchedule.today(),1),attempts:[]};
-  const owner=pixelAccount.uid;refreshGuestForReview();
-  state.reviews=[...(state.reviews||[]),card];savingReview=true;
-  const submit=form.querySelector('button');submit.disabled=true;
-  try{
-   if(!await save(true))throw Error('storage');
-   if(pixelAccount.uid===owner && form===$('review-form') && modal.open){
+  await saveWithFiles(form,card.id,s=>{s.reviews=[...(s.reviews||[]),card];},()=>{
     modal.close();toast(reviewDate(card.firstDue)+'부터 복습 퀘스트로 뽑힐 수 있어요.');
-   }
-  }catch{
-   if(pixelAccount.uid===owner){state.reviews=(state.reviews||[]).filter(c=>c.id!==card.id);toast('카드를 저장하지 못했어요. 다시 눌러 주세요.');}
-  }finally{savingReview=false;submit.disabled=false;render();}
+  });
  };
  $('review-question').focus();
 }
@@ -282,11 +286,11 @@ function openReview(id){
  if(finished){reviewRecord(id);return;}
  const day=reviewSchedule.today();
  if(!dailyDraw(day).ids.includes(id) || due>day){render();return;}
- show('오늘의 복습 · '+streak+' / 4 연속 정답',card.question,'<label class="field">떠올린 답 <small>(선택)</small><textarea id="recall" maxlength="4000" placeholder="말로 떠올리거나 여기에 적어 보세요."></textarea></label>'+
+ show('오늘의 복습 · '+streak+' / 4 연속 정답',card.question,materials.section(id,'prompt',false)+'<label class="field">떠올린 답 <small>(선택)</small><textarea id="recall" maxlength="4000" placeholder="말로 떠올리거나 여기에 적어 보세요."></textarea></label>'+
   '<div class="actions">'+b('답 확인','compare-review','primary')+b('모르겠다','grade-no')+'</div>');
  currentReview={id,due,day};
 }
-function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span><p>'+escapeHTML(card.answer)+'</p></div>';}
+function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span><p>'+escapeHTML(card.answer)+'</p></div>'+materials.section(card.id,'answer',false);}
 function currentTurn(){
  const round=currentReview,card=round && reviewById(round.id);
  const day=reviewSchedule.today();
@@ -307,7 +311,7 @@ async function gradeReview(correct){
  refreshGuestForReview();
  const turn=currentTurn();if(!turn)return;
  const {round,card}=turn,owner=pixelAccount.uid,before=reviewSchedule.progress(card);
- const attempt={due:round.due,day:reviewSchedule.today(),correct};
+ const attempt={due:round.due,day:reviewSchedule.today(),correct,at:Date.now()};
  card.attempts.push(attempt);
  savingReview=true;
  const buttons=[...$('modal-body').querySelectorAll('button')];
@@ -333,12 +337,12 @@ async function gradeReview(correct){
 function reviewRecord(id){
  const card=reviewById(id);if(!card)return;
  const progress=reviewSchedule.progress(card);if(!progress.finished)return;
- show('완료한 복습 · '+reviewDate(progress.finished),card.question,answerBlock(card)+
+ show('완료한 복습 · '+reviewDate(progress.finished),card.question,materials.section(id,'prompt',false)+answerBlock(card)+
   '<p class="skill-result">4회 연속 정답 · 복습 XP '+progress.xp+'</p>'+b('닫기','close'));
 }
 function quest(id){
  const q=find(id);if(!q)return;if(q.status==='done'){record(id);return}
- const t=tFor(q.track),intro='<p class="muteline">'+escapeHTML(questFocus(q))+' · 완료 보상 '+studio.questPay(q)+' token</p><p class="lead">'+escapeHTML(q.title?q.question:'연습 스킬 · '+t.skills[q.skill])+'</p>';
+ const t=tFor(q.track),intro='<p class="muteline">'+escapeHTML(questFocus(q))+' · 완료 보상 '+studio.questPay(q)+' token</p><p class="lead">'+escapeHTML(q.title?q.question:'연습 스킬 · '+t.skills[q.skill])+'</p>'+materials.section(id,'quest');
  if(q.status==='ready'){
   show(t.name+' / '+t.skills[q.skill],qTitle(q),intro+'<form id="prediction-form"><label class="field">시작 전 내 예측<textarea id="prediction" maxlength="800" placeholder="아직 감이 안 오면 비워 둬도 돼요.">'+escapeHTML(q.predictionDraft||'')+'</textarea></label><div class="muteline">지금의 생각을 남기면 확인해 볼 도전 카드 한 장이 열려요.</div><button class="primary" type="submit">예측 봉인 · 도전 카드 열기</button></form>');
   $('prediction').oninput=e=>{q.predictionDraft=e.target.value;save()};
@@ -359,7 +363,7 @@ function itemBox(i){return '<div class="reward">'+sprite(i)+'<div><h3>'+lootDefs
 function reward(q){const skill=tFor(q.track).skills[q.skill],a=q.rankBefore,z=q.rankAfter;
  show('퀘스트 완료','연구 성과를 획득했어요',itemBox(q.loot)+'<p class="skill-result"><b>+'+studio.questPay(q)+' token</b><br>'+escapeHTML(questFocus(q))+' · <strong>'+skill+'</strong> · 경험 +1<br>'+(a===z?ranks[z]+' 단계':ranks[a]+' → '+ranks[z])+'</p><div class="actions">'+b('책상에 놓기','place-loot','primary',q.loot)+b('연구 일지 보기','record','secondary',q.id)+'</div>');}
 function record(id){const q=find(id);if(!q||q.status!=='done')return;const t=tFor(q.track);show('연구 일지 / '+new Date(q.ended).toLocaleDateString('ko-KR'),qTitle(q),
- '<dl class="record">'+[['질문',q.question],['시작 전 예측',q.prediction||'예측 보류'],['도전 카드',t.cards[q.card].join(' · ')],['결과',q.verdict],['관찰과 근거',q.finding],['연결한 스킬',questFocus(q)],['획득한 token',String(studio.questPay(q))],['성장',t.skills[q.skill]+' · 경험 +1 · '+ranks[q.rankAfter]]].map(([k,v])=>'<dt>'+k+'</dt><dd>'+escapeHTML(v)+'</dd>').join('')+'</dl>'+itemBox(q.loot)+b('일지 목록','journal','secondary'));}
+ '<dl class="record">'+[['질문',q.question],['시작 전 예측',q.prediction||'예측 보류'],['도전 카드',t.cards[q.card].join(' · ')],['결과',q.verdict],['관찰과 근거',q.finding],['연결한 스킬',questFocus(q)],['획득한 token',String(studio.questPay(q))],['성장',t.skills[q.skill]+' · 경험 +1 · '+ranks[q.rankAfter]]].map(([k,v])=>'<dt>'+k+'</dt><dd>'+escapeHTML(v)+'</dd>').join('')+'</dl>'+materials.section(id,'quest')+itemBox(q.loot)+b('일지 목록','journal','secondary'));}
 function skillSheet(id){const t=tFor(id);show('스킬 수첩',t.name,'<p>'+t.hint+'</p>'+t.skills.map((s,i)=>{const {xp,rank}=stats(id,i);return '<div class="progress-line"><strong>'+s+'</strong><span>'+ranks[rank]+' · 경험 '+xp+'</span></div>'}).join(''));}
 function desk(item=null){
  selectedLoot=item;
@@ -382,7 +386,7 @@ function summary(s) {
 function savePanel(message='') {
   pendingImport = null;
   const previous = !pixelAccount.uid && storedValue(previousKey);
-  const webLink = localDemo ? '<p class="save-guide">이 파일에서 세이브를 내보낸 뒤, <a href="https://pixel-research-lab.github.io/pixel-research-lab/" target="_blank" rel="noopener">배포된 연구실 열기 ↗</a>에서 가져오세요.</p>' : (pixelAccount.uid ? '<p class="save-guide">같은 계정의 다른 기기와 자동 동기화됩니다. 파일로도 백업할 수 있어요.</p>' : '<p class="save-guide">로그인하면 같은 계정의 기기에서 이어 할 수 있어요.</p>'+b('계정 연결','account'));
+  const webLink = studio.previewCredit ? '<p class="save-guide">체험 기록과 첨부 원본을 파일로 옮길 수 있어요.</p>' : localDemo ? '<p class="save-guide">이 파일에서 세이브를 내보낸 뒤, <a href="https://pixel-research-lab.github.io/pixel-research-lab/" target="_blank" rel="noopener">배포된 연구실 열기 ↗</a>에서 가져오세요.</p>' : (pixelAccount.uid ? '<p class="save-guide">같은 계정의 다른 기기와 자동 동기화됩니다. 파일로도 백업할 수 있어요.</p>' : '<p class="save-guide">로그인하면 같은 계정의 기기에서 이어 할 수 있어요.</p>'+b('계정 연결','account'));
   show('내 연구실','세이브 관리',summary(state)+webLink+
     '<div class="actions">'+b('세이브 내보내기','export-save','primary')+b('세이브 가져오기','choose-save')+'</div>'+
     '<input type="file" id="save-file" hidden accept=".json,application/json">'+
@@ -391,19 +395,25 @@ function savePanel(message='') {
   $('save-file').onchange = async e => {
     const file = e.target.files[0];
     if (!file) return;
-    try { previewImport(labSave.read(await file.text()), false); }
+    const identity=fileOwner();
+    try { const record=JSON.parse(await file.text());if(identity===fileOwner() && e.target.isConnected)previewImport(labSave.read(record),false,record.originals); }
     catch { savePanel('읽을 수 없는 세이브예요. 픽셀 연구실에서 내보낸 JSON 파일을 선택해 주세요.'); }
   };
 }
-function previewImport(next, restoring) {
-  pendingImport = {next, base:storedValue(key)};
+function previewImport(next, restoring,originals) {
+  pendingImport = {next,restoring,originals,identity:fileOwner(),base:storedValue(key)};
   show('세이브 관리',restoring?'이전 연구실로 돌아갈까요?':'이 세이브를 불러올까요?',
     summary(next)+(pixelAccount.uid?'<p>계정의 퀘스트와 합치고 파일의 책상 배치를 적용해요. 이미 완료한 퀘스트는 유지합니다.</p>':'<p>현재 퀘스트와 책상 배치가 이 기록으로 바뀝니다. 적용 전 상태도 이 브라우저에 보관해요.</p>')+'<div class="actions">'+
     b('적용하기','apply-save','primary')+b('취소','save-panel')+'</div>');
 }
-function applyImport() {
+async function applyImport() {
   if (!pendingImport) return;
-  const {next,base} = pendingImport;
+  const request=pendingImport,{next,base,identity,originals,restoring}=request;
+  const applyButton=document.querySelector('[data-do="apply-save"]');
+  if(applyButton.disabled)return;applyButton.disabled=true;
+  try{if(!restoring)await labFiles.restore(next,originals,identity);}
+  catch(err){if(fileOwner()===identity)savePanel(err.message);return;}
+  if(pendingImport!==request || fileOwner()!==identity || !modal.open || !applyButton.isConnected)return;
   if(pixelAccount.uid){
     pixelAccount.edit(next,true); pendingImport=null;changeTab(true);toast('계정 기록과 합치는 중이에요.');return;
   }
@@ -425,6 +435,8 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
  case 'studio':studioUI.shop();break;case 'axes':studioUI.settings();break;
+ case 'review-files':show('복습 관리','복습 자료 관리',reviewRows().map(r=>b(r.card.question,'edit-review-files','secondary',r.card.id)).join(' '));break;
+ case 'edit-review-files':{const c=reviewById(arg);if(c)show('복습 자료 관리',c.question,materials.section(arg,'prompt')+materials.section(arg,'answer')+b('목록','review-files'));break;}
  case 'new-review':newReview();break;
  case 'review-settings':reviewSettings();break;
  case 'review':openReview(arg);break;
@@ -440,14 +452,15 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'sign-out':pixelAccount.logout().catch(()=>toast('로그아웃을 완료하지 못했어요.'));break;
  case 'sync-now':pixelAccount.retry();break;
  case 'save-panel':savePanel();break;
- case 'export-save':labSave.download(state);$('transfer-info').textContent='세이브 파일을 내보냈어요.';break;
+ case 'export-save':{const info=$('transfer-info');el.disabled=true;info.textContent='첨부 원본을 모으는 중…';
+ labSave.download(structuredClone(state),fileOwner()).then(()=>info.textContent='세이브 파일을 내보냈어요.').catch(err=>info.textContent=err.message).finally(()=>el.disabled=false);break;}
  case 'choose-save':$('save-file').click();break;
  case 'previous-save':try {previewImport(labSave.read(storedValue(previousKey)), true);} catch {savePanel('이전 세이브를 읽을 수 없어요.');}break;
  case 'apply-save':applyImport();break;
  case 'music':if(navigator.onLine){window.open('https://www.youtube.com/','_blank','noopener,noreferrer');}else{toast('스피커는 인터넷에 연결한 뒤 켤 수 있어요.');}break;
  case 'field':fieldForm();break;
  case 'new':newForm();break; case 'reroll':takeOffer();save();render();break;
- case 'accept':{const r=requests[state.offer];const ongoing=state.quests.find(q=>q.status!=='done'&&q.title===r[0]);const q=ongoing||make(r[1],r[2],r[3],r[0]);takeOffer();save();render();quest(q.id);break;}
+ case 'accept':{const r=requests[state.offer];const ongoing=state.quests.find(q=>q.status!=='done'&&q.title===r[0]);const q=ongoing||make(r[1],r[2],r[3],r[0]);if(!ongoing)state.quests.push(q);takeOffer();save();render();quest(q.id);break;}
  case 'quest':quest(arg);break;case 'record':record(arg);break;case 'skill':skillSheet(arg);break;
  case 'desk':removeMode=false;desk();break;case 'place-loot':case 'pick':removeMode=false;desk(arg);break;
  case 'item':show('전리품 서랍',lootDefs[arg][0],itemBox(arg)+b('책상에 놓기','place-loot','primary',arg));break;
@@ -498,14 +511,17 @@ async function commit(change){
  if(!uid && navigator.locks)return navigator.locks.request(key+'.edit',apply);
  return apply();
 }
+const fileOwner=()=>pixelAccount.uid||'guest:'+key;
+const materials=createMaterialUI({getState:()=>state,owner:fileOwner,commit,esc:escapeHTML,toast});
+const petUI=createPetUI({getState:()=>state,show,commit,toast});
 const studioUI=createStudioUI({getState:()=>state,show,toast,escapeHTML,commit});
 const planner=createPlanner({getState:()=>state,show,toast,escapeHTML,commit});
 pixelAccount.init({
- readGuest:pixelAccountGuest,
+ readGuest:pixelAccountGuest,copyGuestFiles:(g,uid)=>labFiles.copy(g,'guest:'+key,uid),
  claimGuest: guest=>{if(storedValue(key)===JSON.stringify(guest)){localStorage.removeItem(key);localStorage.removeItem(previousKey);}},
  guest:()=>{let g;try{g=JSON.parse(storedValue(key));}catch{}redraw(g&&labSave.valid(g)?g:blank());},
  busy:v=>{document.querySelector('main').inert=v;document.querySelector('header').inert=v;},
- closeAccount:()=>{planner.reset();if(modal.open)modal.close();toast('');redraw(blank());},
+ closeAccount:()=>{materials.close();planner.reset();if(modal.open)modal.close();toast('');redraw(blank());},
  apply:redraw,alert:toast,
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });
