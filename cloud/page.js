@@ -54,7 +54,7 @@ async function upload(){
     if(owner===uid){problem=e.code?.includes('permission')?'계정 접근 권한 확인 필요':'동기화 대기';soon(15000);}
   } finally {if(sending===tag){sending=null;announce();}}
 }
-function edit(state,importing=false){
+function edit(state,importing=false,confirmLocal=false){
   if(!uid || !baseline) return false;
   const owner=uid;
   const delta=clone(changes(baseline,state));
@@ -63,14 +63,19 @@ function edit(state,importing=false){
   if(delta.length || importing) {
     problem='동기화 대기';announce();
     localWrites++;
-    queue(async()=>{
+    const saved=queue(async()=>{
       try { await update(owner,delta,'local',actor); }
       finally {localWrites--;}
       if(owner!==uid)return;
       channel?.postMessage(owner);
       requestBackground();soon();
       if(!localWrites) await refresh(owner);
-    }).catch(()=>{});
+    });
+    if(confirmLocal) return saved.then(()=>true,async()=>{
+      if(owner===uid) await refresh(owner);
+      return false;
+    });
+    saved.catch(()=>{});
   }
   return true;
 }

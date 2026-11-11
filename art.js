@@ -11,9 +11,35 @@ const icons={
 const glyphs={read:[' GGG GGG ',' GLG GLG ',' GLG GLG ',' GLG GLG ',' GGGGGGG ','    G    '],design:['    Y    ','   YOY   ','  YOKOY  ','   YOY   ','    Y    '],code:[' B     B ','B   b   B',' B b   B ','  b  B   '],infer:['  GGG    ',' GbbWG   ',' GbWWG   ','  GGGK   ','      KK '],write:['      RO ','     RYO ','    RYO  ','   RYO   ','  KYO    ',' KK      ']};
 function stamp(ctx,pattern,x,y,scale=1){pattern?.forEach((line,j)=>{for(let i=0;i<line.length;i++){const col=palette[line[i]];if(col){ctx.fillStyle=col;ctx.fillRect(x+i*scale,y+j*scale,scale,scale)}}});}
 function paintIcons(){document.querySelectorAll('canvas[data-sprite]').forEach(c=>{const key=c.dataset.sprite,ctx=c.getContext('2d'),p=icons[key]||glyphs[key];c.width=c.height=18;ctx.clearRect(0,0,18,18);if(p)stamp(ctx,p,Math.floor((18-Math.max(...p.map(l=>l.length)))/2),Math.floor((18-p.length)/2));});}
-function paintRoom(slots){
+// Sky bands, distant hills, and trees use the same local-time palette.
+const skyPalettes = {
+ night:['#253554','#354766','#4d6076','#63777f','#516774','#3e535e','#334955','#415963'],
+ dawn:['#9c94ae','#d4b0b1','#f1bd93','#efd29e','#a2999c','#807f86','#626c70','#74817d'],
+ day:['#a2beb5','#c1cbb2','#e8cd9c','#d4b48c','#93a69b','#758f82','#58776b','#688779'],
+ dusk:['#887b9b','#cd91a0','#f2ab83','#e7bb8e','#9d8c96','#777582','#5a626f','#6a7178']
+};
+const skyStops = [[0,'night',1],[5,'night',1],[6,'dawn',0.45],[7,'day',0],
+ [17,'day',0],[18,'dusk',0.5],[19,'night',1],[24,'night',1]];
+function skyAt(date) {
+ const hour=date.getHours()+date.getMinutes()/60;
+ const end=skyStops.findIndex(stop=>stop[0]>hour), [a,first,dimA]=skyStops[end-1], [b,last,dimB]=skyStops[end];
+ const fraction=(hour-a)/(b-a);
+ const colors=skyPalettes[first].map((hex,i)=>{
+   const target=skyPalettes[last][i];
+   const channel=n=>Math.round(parseInt(hex.slice(n,n+2),16)*(1-fraction)+parseInt(target.slice(n,n+2),16)*fraction);
+   return 'rgb('+[1,3,5].map(channel).join(',')+')';
+ });
+ const moon=hour<6||hour>=18;
+ const arc=((hour-(moon?18:6)+24)%24)/12;
+ return {colors,moon,x:Math.round(18+85*arc),y:Math.round(64-42*Math.sin(Math.PI*arc)),
+   dim:dimA+(dimB-dimA)*fraction,label:hour<5||hour>=19?'밤':hour<7?'해돋이':hour<17?'낮':'노을'};
+}
+const clockDigits=['111101101101111','010110010010111','111001111100111','111001111001111',
+ '101101111001001','111100111001111','111100111101111','111001010010010','111101111101111','111101111001111'];
+function paintRoom(slots,date=new Date()){
  const c=document.getElementById('room-art'),q=c.getContext('2d');
  const R=(x,y,w,h,col)=>{q.fillStyle=col;q.fillRect(x,y,w,h)};
+ const sky=skyAt(date), [top,mid,low,horizon,far,near,trunk,leaf]=sky.colors;
  const wall='#a6b39a',line='#33483e',shadow='#6d826f',wood='#ba895e',bright='#e1b47f',dark='#755b46',edge='#554e40';
  R(0,0,360,166,wall);
  for(let y=3;y<116;y+=12)for(let x=3+(y%2)*4;x<360;x+=12){R(x,y,1,1,'#93a58b');R(x+1,y+1,1,1,'#c0c7a5');}
@@ -21,10 +47,26 @@ function paintRoom(slots){
  for(let y=132;y<166;y+=8){R(0,y,360,1,'#947f66');for(let x=(y%3)*37;x<360;x+=89){R(x,y-6,1,6,'#91816a');R(x+4,y-2,6,1,'#c5ad8c');}}
  // Recessed timber window and a terraced skyline.
  R(12,11,105,91,shadow);R(10,8,105,91,dark);R(12,10,101,86,bright);R(15,13,95,79,'#8cb3af');
- R(15,13,95,17,'#a2beb5');R(15,30,95,15,'#c1cbb2');R(15,45,95,23,'#e8cd9c');R(15,68,95,24,'#d4b48c');
- R(82,29,12,12,'#ffe0a1');R(80,32,16,6,'#ffe0a1');R(18,29,20,2,'#d9d8bc');R(23,27,12,2,'#d9d8bc');R(55,43,20,2,'#eadaaf');
- for(let x=15;x<110;x++){let h=62+Math.round(4*Math.sin(x/9)+4*Math.cos(x/15)); R(x,h,1,92-h,'#93a69b');let z=72+Math.round(6*Math.cos(x/13));R(x,z,1,92-z,'#758f82');}
- for(const [x,y,h] of [[19,63,29],[29,70,21],[102,64,28],[91,73,19],[37,75,17]]){R(x,y,2,h,'#58776b');for(let k=0;k<4;k++)R(x-k-1,y+3+k*4,4+k*2,3,'#688779');}
+ R(15,13,95,17,top);R(15,30,95,15,mid);R(15,45,95,23,low);R(15,68,95,24,horizon);
+ q.save();q.beginPath();q.rect(15,13,95,79);q.clip();
+ if(sky.dim>.45){
+   q.globalAlpha=(sky.dim-.45)/.55;
+   for(const [x,y] of [[23,23],[37,36],[48,18],[76,25],[88,38],[103,19],[69,49]]){
+     R(x,y,1,1,'#f5e7c1');if(x===37||x===76)R(x-1,y,3,1,'#ded7c3');
+   }
+   q.globalAlpha=1;
+ }
+ const {x,y}=sky;
+ if(sky.moon){
+   const rows=[[0,3],[-2,3],[-3,3],[-3,4],[-2,6],[-1,6],[1,4]];
+   rows.forEach(([dx,w],i)=>R(x+dx,y+i-3,w,1,'#f6eac0'));
+ }else{
+   R(x-4,y-6,8,12,'#ffe0a1');R(x-6,y-4,12,8,'#ffe0a1');R(x-7,y-2,14,4,'#ffe0a1');
+ }
+ q.globalAlpha=(1-sky.dim)*.85;
+ R(18,29,20,2,'#d9d8bc');R(23,27,12,2,'#d9d8bc');R(75,43,20,2,'#eadaaf');q.restore();
+ for(let x=15;x<110;x++){let h=62+Math.round(4*Math.sin(x/9)+4*Math.cos(x/15)); R(x,h,1,92-h,far);let z=72+Math.round(6*Math.cos(x/13));R(x,z,1,92-z,near);}
+ for(const [x,y,h] of [[19,63,29],[29,70,21],[102,64,28],[91,73,19],[37,75,17]]){R(x,y,2,h,trunk);for(let k=0;k<4;k++)R(x-k-1,y+3+k*4,4+k*2,3,leaf);}
  R(60,13,4,80,wood);R(61,13,1,80,'#eed0a1');R(15,55,95,3,wood);R(15,55,95,1,bright);
  R(6,95,114,5,dark);R(7,94,112,2,bright);
  // Book shelf, note board and wall calendar.
@@ -51,6 +93,21 @@ function paintRoom(slots){
  const positions=[80,122,221];slots.forEach((id,i)=>{const x=positions[i];if(id){const pat=icons[id],scale=1.45; // integer coordinates preserve crisp edges in the low-resolution raster
  for(let y=0;y<pat.length;y++)for(let j=0;j<pat[y].length;j++){let color=palette[pat[y][j]];if(color)R(x+Math.round(j*scale),103-Math.round((pat.length-y)*scale),Math.round((j+1)*scale)-Math.round(j*scale),Math.round((pat.length-y)*scale)-Math.round((pat.length-y-1)*scale),color);}
  }else{R(x+4,102,12,1,'#a98a67');}});
- c.setAttribute('aria-label','창가의 작업 책상. '+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
+ if(sky.dim>0){
+   q.save();q.globalAlpha=.34*sky.dim;R(0,0,360,166,'#162641');
+   q.globalAlpha=.19*sky.dim;
+   for(let i=0;i<27;i++){const w=9+Math.floor(i*.66);R(267-w,76+i,w*2,1,'#ffe7a3');}
+   q.globalAlpha=.62*sky.dim;R(259,73,18,2,'#ffe09a');R(261,75,14,1,'#fff3bc');
+   R(246,103,41,1,'#ffe4a1');R(250,104,32,1,'#f8ce84');q.restore();
+ }
+ // Four luminous digits in the footprint of the clickable desk clock.
+ R(196,92,24,10,edge);R(197,93,22,7,'#283c37');R(198,102,3,1,dark);R(215,102,3,1,dark);
+ let digitX=199;
+ for(const ch of attendance.time(date)){
+   if(ch===':'){R(digitX,95,1,1,'#dbbd78');R(digitX,97,1,1,'#dbbd78');digitX+=2;continue;}
+   [...clockDigits[Number(ch)]].forEach((bit,i)=>{if(bit==='1')R(digitX+i%3,94+Math.floor(i/3),1,1,'#edcf87');});
+   digitX+=4;
+ }
+ c.setAttribute('aria-label',sky.label+' 풍경의 작업 책상. '+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
 }
 function logo(){const c=document.querySelector('#brand-art'),q=c.getContext('2d');stamp(q,['     L       g      ','      L     g       ','       ggggg        ','    gggLLLLLggg     ','   gLLgggggggLLg    ','   gLLKWWKWWKLLg    ','   gLLKWWKWWKLLg    ','   gLLgggggggLLg    ','    gLLgggggLLg     ','      ggggggg       ','       G   G        '],1,4);}

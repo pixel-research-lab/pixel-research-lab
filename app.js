@@ -4,13 +4,13 @@ const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const tFor=id=>tracks.find(t=>t.id===id);
 const rng=n=>{const r=new Uint32Array(1);crypto.getRandomValues(r);return r[0]%n};
 const choose=a=>a[rng(a.length)];
-const blank=()=>({version:1,quests:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
+const blank=()=>({version:1,quests:[],attendance:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 let state=blank(), loaded=true, toastTimer, selectedLoot=null, home=true;
 try {const s=JSON.parse(localStorage.getItem(key)||'null');if(s && labSave.valid(s))state=s;}catch{loaded=false}
-function save(){
- if(window.pixelAccount?.edit(state))return;
- try{localStorage.setItem(key,JSON.stringify(state));$('save-state').textContent='이 브라우저에 저장';loaded=true;}
- catch{loaded=false;$('save-state').textContent='현재 창에만 저장';}
+function save(confirmLocal=false){
+ if(window.pixelAccount?.uid)return pixelAccount.edit(state,false,confirmLocal);
+ try{localStorage.setItem(key,JSON.stringify(state));$('save-state').textContent='이 브라우저에 저장';loaded=true;return true;}
+ catch{loaded=false;$('save-state').textContent='현재 창에만 저장';return false;}
 }
 function toast(s){$('toast').textContent=s;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').textContent='',2800);}
 function sprite(id,cls='sprite'){return '<canvas width="18" height="18" data-sprite="'+id+'" class="'+cls+'" aria-hidden="true"></canvas>'}
@@ -29,8 +29,85 @@ function render(){
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- paintRoom(state.slots);paintIcons();
+ resetClockView();paintIcons();
 }
+let studyDay, paintedMinute, recordedSecond, loggedMinute;
+let writingShift=false;
+const shiftActions={
+ idle:['start','연구 시작'], working:['pause','잠시 비움'], paused:['resume','연구 재개']
+};
+function resetClockView(){
+ studyDay=attendance.timeline(state.attendance);
+ paintedMinute=recordedSecond=loggedMinute=null;
+ updateClock();
+}
+function updateClock(){
+ if(!studyDay)return;
+ const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
+ if(home && paintedMinute!==minute){paintRoom(state.slots,date);paintedMinute=minute;}
+ if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
+ const second=Math.floor(now/1000);
+ if(recordedSecond===second)return;
+ recordedSecond=second;
+ $('study-total').textContent=attendance.duration(attendance.dayTotal(studyDay,date,now));
+ const last=studyDay.accepted.at(-1);
+ const status=studyDay.status, [action,label]=shiftActions[status];
+ const lastTime=last?attendance.time(new Date(last.at)):'';
+ const lastToday=last && last.at>=attendance.dayStart(date);
+ $('shift-status').textContent=status==='working'?'연구 중 · '+lastTime+'부터':
+   status==='paused'?'자리 비움 · '+lastTime+'부터':lastToday?'퇴근 '+lastTime:'출근 전';
+ const main=$('shift-main'),out=$('shift-out');
+ main.dataset.arg=action;main.textContent=label;
+ main.disabled=out.disabled=writingShift;
+ out.hidden=status==='idle';
+}
+function paintShiftLog(date){
+ const entries=[];
+ for(let n=0;n<7;n++){
+   const from=attendance.dayStart(date,-n),day=new Date(from),to=attendance.dayStart(day,1);
+   const events=studyDay.accepted.filter(e=>e.at>=from && e.at<to);
+   const total=attendance.dayTotal(studyDay,day,date.getTime());
+   if(!events.length && !total)continue;
+   const first=events.find(e=>e.action==='start'),last=events.at(-1);
+   const labels={start:'연구 시작',pause:'자리 비움',resume:'연구 재개',finish:'퇴근'};
+   const marks=[];
+   if(first && first!==last)marks.push('출근 '+attendance.time(new Date(first.at)));
+   if(last)marks.push(labels[last.action]+' '+attendance.time(new Date(last.at)));
+   entries.push('<div class="shift-entry"><b>'+day.toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'})+
+    '</b><small>'+(marks.join(' · ')||'전날부터 이어진 연구')+'</small><time>'+attendance.duration(total)+'</time></div>');
+ }
+ $('shift-log').innerHTML=entries.join('')||'<div class="empty-log">연구를 시작하면 여기에 출퇴근 기록이 남아요.</div>';
+}
+async function recordShift(action){
+ if(writingShift || !attendance.next[studyDay.status][action])return;
+ const owner=pixelAccount.uid;
+ // Include guest edits from another tab that may have committed since the last storage event.
+ if(!owner){
+   const guest=pixelAccountGuest();
+   if(guest && labSave.valid(guest)){state=guest;resetClockView();}
+   if(!attendance.next[studyDay.status][action])return;
+ }
+ const last=studyDay.accepted.at(-1), id=crypto.randomUUID();
+ const event={id,action,at:Math.max(Date.now(),(last?.at||0)+1)};
+ state.attendance=[...(state.attendance||[]),event];
+ writingShift=true;resetClockView();
+ try{
+   if(!await save(true))throw Error('storage');
+   if(action==='finish' && pixelAccount.uid===owner){
+     toast('퇴근 기록을 이 기기에 저장했어요.');
+     if(owner && navigator.onLine)pixelAccount.retry();
+   }
+ }catch{
+   if(pixelAccount.uid===owner){
+     state.attendance=(state.attendance||[]).filter(e=>e.id!==id);
+     toast('출퇴근 기록을 저장하지 못했어요. 저장 공간을 확인하고 다시 눌러 주세요.');
+   }
+ }finally{writingShift=false;resetClockView();}
+}
+function pixelAccountGuest(){try{return JSON.parse(localStorage.getItem(key));}catch{return null;}}
+setInterval(()=>{if(!document.hidden)updateClock();},500);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateClock();});
+window.addEventListener('pageshow',updateClock);
 function changeTab(isHome){home=isHome;if(modal.open)modal.close();render();window.scrollTo({top:0});}
 function show(context,title,body){
  $('dialog-context').textContent=context;$('modal-body').innerHTML='<div class="modal-content"><h2 id="dialog-name">'+escapeHTML(title)+'</h2>'+body+'</div>';
@@ -138,6 +215,8 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
  save();render();desk();toast(lootDefs[id][0]+' 배치 완료');}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
+ case 'shift':recordShift(arg);break;
+ case 'focus-clock':$('shift-main').focus();break;
  case 'account':accountPanel();break;
  case 'sign-in':pixelAccount.login().catch(e=>{const field=$('auth-feedback');if(field)field.textContent=e.code==='auth/popup-closed-by-user'?'로그인 창이 닫혔어요.':'로그인을 마치지 못했어요. 인터넷 연결과 팝업 허용을 확인해 주세요.';});break;
  case 'sign-out':pixelAccount.logout().catch(()=>toast('로그아웃을 완료하지 못했어요.'));break;
@@ -167,7 +246,7 @@ function accountPanel(){
  const account=pixelAccount;
  const info=account.uid
   ? '<p>'+escapeHTML(account.email||'연결된 계정')+'</p><p id="account-state"></p><div class="actions">'+b('지금 동기화','sync-now')+b('로그아웃','sign-out','textbtn')+'</div><p class="save-guide">'+('SyncManager' in window?'탭을 닫은 뒤에는 브라우저가 허용할 때 대기 기록을 보내요.':'오프라인에서 창을 닫았다면 인터넷에 연결한 뒤 연구실을 다시 열어 주세요.')+'</p>'
-  : '<p>이 기기의 퀘스트와 책상 배치를 내 계정에 연결해요. 다른 기기에서도 같은 Google 계정으로 로그인하세요.</p>'+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
+  : '<p>로그인 전 연구실은 이 브라우저에서 이어져요. 처음 연결하면 여기에 있는 퀘스트, 책상 배치, 출퇴근 기록을 내 계정으로 옮겨요. 다른 기기에서도 같은 Google 계정으로 로그인하세요.</p>'+b('Google로 로그인','sign-in','primary')+'<p id="auth-feedback" role="status"></p>';
  show('내 연구실','계정 동기화',info);
  if($('account-state'))$('account-state').textContent=account.status;
 }
@@ -186,11 +265,11 @@ function redraw(next){
  state=next;render();
 }
 pixelAccount.init({
- readGuest:()=>{try{return JSON.parse(localStorage.getItem(key));}catch{return null;}},
+ readGuest:pixelAccountGuest,
  claimGuest: guest=>{if(storedValue(key)===JSON.stringify(guest)){localStorage.removeItem(key);localStorage.removeItem(previousKey);}},
  guest:()=>{let g;try{g=JSON.parse(storedValue(key));}catch{}redraw(g&&labSave.valid(g)?g:blank());},
  busy:v=>{document.querySelector('main').inert=v;document.querySelector('header').inert=v;},
- closeAccount:()=>{if(modal.open)modal.close();},
+ closeAccount:()=>{if(modal.open)modal.close();toast('');redraw(blank());},
  apply:redraw,alert:toast,
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });

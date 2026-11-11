@@ -1,9 +1,10 @@
 // Each quest earns one reward. Completing it on two devices still produces one entry.
-export const emptyLab = () => ({version:1,quests:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
+export const emptyLab = () => ({version:1,quests:[],attendance:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 const phase = {ready:1, active:2, done:3};
 export function parts(state) {
   const entries = new Map();
   const extras = {...state.inventory};
+  for (const event of state.attendance || []) entries.set('time~'+event.id,event);
   for (const quest of state.quests) {
     entries.set('q~'+quest.id, quest);
     if (quest.status === 'done') extras[quest.loot] = (extras[quest.loot] || 0) - 1;
@@ -34,6 +35,7 @@ export function materialize(rows) {
   for (const row of rows) {
     const {id,value}=row;
     if (id.startsWith('q~')) state.quests.push(value);
+    if (id.startsWith('time~')) state.attendance.push(value);
     if (id.startsWith('gift~')) gift[id.slice(5)]=value;
     if (id.startsWith('slot~')) slots[Number(id.slice(5))]=row;
     if (id==='board') Object.assign(state,value);
