@@ -37,7 +37,7 @@ const labSave = (() => {
       if (q.status === 'done' && (!knownItem(q.loot) || !between(q.rankAfter,0,ranks.length-1) ||
           !between(q.rankBefore,0,ranks.length-1) || !Number.isFinite(q.ended))) return false;
     }
-    return true;
+    return studio.valid(s);
   }
   function read(text) {
     const record = JSON.parse(text);

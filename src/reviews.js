@@ -50,13 +50,13 @@ const reviewSchedule = (() => {
     // schedules diverged. A second answer on the same day cannot advance the streak.
     const turns = [...card.attempts].sort((a,b)=>a.day.localeCompare(b.day) ||
       Number(a.correct)-Number(b.correct) || a.due.localeCompare(b.due));
-    let due = card.firstDue, streak = 0, xp = 0, finished = null, retry = false;
+    let due = card.firstDue, streak = 0, xp = 0, finished = null, retry = false, correctTurns = 0;
     for (const attempt of turns) {
       if (beforeDay && attempt.day >= beforeDay) break;
       if (attempt.day < due) continue;
       retry = !attempt.correct;
       if (attempt.correct) {
-        streak++;
+        streak++; correctTurns++;
         xp = Math.max(xp, streak * 10);
       } else {
         xp = Math.max(xp, streak * 10 + 1);
@@ -65,7 +65,7 @@ const reviewSchedule = (() => {
       if (streak === 4) { finished = attempt.day; due = null; break; }
       due = addDays(attempt.day, intervals[streak]);
     }
-    return {due, streak, xp, finished, retry};
+    return {due, streak, xp, finished, retry, correctTurns};
   }
   function dailyRandom(day, id) {
     // The same dated card gets the same uniform score regardless of device or input order.

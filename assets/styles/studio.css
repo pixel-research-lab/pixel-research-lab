@@ -1,0 +1,42 @@
+/* Room workshop and skill notebook use the game's paper, ink and wood palette. */
+.room-shop,.studio-wallet,.studio-checkout,.axis-edit,.axis-add {display:flex;align-items:center;gap:12px}
+.room-shop {flex-wrap:wrap;justify-content:flex-end;gap:5px 12px}
+#token-balance,.studio-wallet strong{font:700 13px ui-monospace,monospace;color:#664c28;background:#f2e4b8;border:1px solid #ccba89;border-radius:3px;padding:4px 7px;white-space:nowrap}
+.studio-wallet,.studio-checkout{justify-content:space-between}
+.studio-wallet{margin:4px 0 10px;color:#536654}
+#studio-preview{display:block;width:100%;height:auto;image-rendering:pixelated;border:2px solid #88947c;border-radius:3px;background:#b9c3aa}
+.studio-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:15px 0 10px}
+.studio-tabs button,.studio-grid button{color:#394f40;background:#faf7e9;border:1px solid #b0b49c;border-radius:4px;cursor:pointer}
+.studio-tabs button{padding:5px 14px}
+.studio-tabs [aria-pressed="true"]{color:#faf7e9;background:#47644f;border-color:#47644f}
+.studio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.studio-grid button{display:flex;align-items:center;gap:9px;text-align:left;padding:8px}
+.studio-grid [aria-pressed="true"]{background:#ebefd9;box-shadow:inset 0 0 0 2px #688364}
+.studio-grid i{width:17px;height:17px;border:2px solid #43554466;box-shadow:2px 2px #0002;flex:none}
+.studio-grid small{display:block;color:#586551;font-size:11px}
+.studio-checkout{border-top:1px dashed #acae92;margin-top:14px;padding-top:12px}
+.studio-checkout p{margin:3px 0;color:#596956;font-size:13px}
+.studio-checkout button:disabled{opacity:.6;cursor:default}
+#skill-chart{padding:14px;color:#506453}
+.radar-wrap{display:grid;grid-template-columns:minmax(115px,1fr) minmax(100px,1fr);align-items:center;gap:12px}
+.radar-wrap svg{width:100%;max-height:225px}
+.radar-ring{fill:#eff0df;stroke:#a5af96;stroke-width:1}
+.radar-wrap line{stroke:#b6bca9}
+.radar-score{fill:#87ad8299;stroke:#466e55;stroke-width:2}
+.radar-wrap circle{fill:#375f49}
+.radar-wrap text{text-anchor:middle;dominant-baseline:central;font:bold 10px ui-monospace,monospace;fill:#4b6151}
+.axis-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.axis-list li,.stat-bar{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;font-size:13px;overflow-wrap:anywhere}
+.axis-list b,.stat-bar b{font:600 12px ui-monospace,monospace;white-space:nowrap}
+.axis-key{font:11px ui-monospace,monospace;background:#e6ead6;padding:2px 3px}
+.stat-bars{display:grid;gap:10px}
+.stat-bar{grid-template-columns:1fr auto}
+.stat-bar div{grid-column:1/-1;background:#e0e3d2;height:9px}
+.stat-bar i{display:block;height:100%;background:#7c9e77}
+.legacy-skills summary{cursor:pointer;padding:6px 14px 12px;color:#536653;font-size:13px}
+.axis-edit{padding:3px 0}
+.axis-edit input[type="checkbox"]{width:17px;height:17px;accent-color:#4b7257}
+.axis-edit input:not([type="checkbox"]),.axis-add input{min-width:0;flex:1;padding:6px;color:#304735;background:#fffdf1;border:1px solid #abae98;border-radius:3px}
+.axis-add{align-items:flex-start;border-top:1px dashed #b7b7a1;margin-top:10px;padding-top:10px}
+.axis-add label{min-width:0;flex:1}
+@media(max-width:530px){.studio-checkout{align-items:flex-start;flex-direction:column}.room .paneltop{flex-wrap:wrap}.studio-tabs button{padding:5px 10px}.radar-wrap{gap:4px}.studio-grid button{gap:5px}.axis-list li{font-size:12px}}

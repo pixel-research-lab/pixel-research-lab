@@ -36,8 +36,8 @@ function skyAt(date) {
 }
 const clockDigits=['111101101101111','010110010010111','111001111100111','111001111001111',
  '101101111001001','111100111001111','111100111101111','111001010010010','111101111101111','111101111001111'];
-function paintRoom(slots,date=new Date()){
- const c=document.getElementById('room-art'),q=c.getContext('2d');
+function paintRoom(slots,date=new Date(),appearance={},c=document.getElementById('room-art')){
+ const q=c.getContext('2d');
  const R=(x,y,w,h,col)=>{q.fillStyle=col;q.fillRect(x,y,w,h)};
  const sky=skyAt(date), [top,mid,low,horizon,far,near,trunk,leaf]=sky.colors;
  const wall='#a6b39a',line='#33483e',shadow='#6d826f',wood='#ba895e',bright='#e1b47f',dark='#755b46',edge='#554e40';
@@ -45,6 +45,7 @@ function paintRoom(slots,date=new Date()){
  for(let y=3;y<116;y+=12)for(let x=3+(y%2)*4;x<360;x+=12){R(x,y,1,1,'#93a58b');R(x+1,y+1,1,1,'#c0c7a5');}
  R(0,0,360,3,'#7a8c73');R(0,121,360,3,'#526858');R(0,124,360,4,'#81947e');R(0,128,360,38,'#b69b79');
  for(let y=132;y<166;y+=8){R(0,y,360,1,'#947f66');for(let x=(y%3)*37;x<360;x+=89){R(x,y-6,1,6,'#91816a');R(x+4,y-2,6,1,'#c5ad8c');}}
+ drawWall(R,appearance.wall);drawFloor(R,appearance.floor);
  // Recessed timber window and a terraced skyline.
  R(12,11,105,91,shadow);R(10,8,105,91,dark);R(12,10,101,86,bright);R(15,13,95,79,'#8cb3af');
  R(15,13,95,17,top);R(15,30,95,15,mid);R(15,45,95,23,low);R(15,68,95,24,horizon);
@@ -67,8 +68,13 @@ function paintRoom(slots,date=new Date()){
  R(18,29,20,2,'#d9d8bc');R(23,27,12,2,'#d9d8bc');R(75,43,20,2,'#eadaaf');q.restore();
  for(let x=15;x<110;x++){let h=62+Math.round(4*Math.sin(x/9)+4*Math.cos(x/15)); R(x,h,1,92-h,far);let z=72+Math.round(6*Math.cos(x/13));R(x,z,1,92-z,near);}
  for(const [x,y,h] of [[19,63,29],[29,70,21],[102,64,28],[91,73,19],[37,75,17]]){R(x,y,2,h,trunk);for(let k=0;k<4;k++)R(x-k-1,y+3+k*4,4+k*2,3,leaf);}
+ if(appearance.room && appearance.room!=='studio'){
+   q.save();q.beginPath();q.rect(15,13,95,79);q.clip();
+   R(15,48,95,20,low);R(15,68,95,24,horizon);drawNewView(R,appearance.room,sky);q.restore();
+ }
  R(60,13,4,80,wood);R(61,13,1,80,'#eed0a1');R(15,55,95,3,wood);R(15,55,95,1,bright);
  R(6,95,114,5,dark);R(7,94,112,2,bright);
+ drawArchitecture(R,appearance.room,sky);
  // Book shelf, note board and wall calendar.
  R(135,43,86,3,shadow);R(133,40,89,3,dark);R(134,39,87,2,bright);R(141,43,3,4,dark);R(212,43,3,4,dark);
  const bcols=['#a4624d','#638277','#d4b776','#80889a','#9c775f','#688b8b','#c29b60'];
@@ -90,6 +96,7 @@ function paintRoom(slots,date=new Date()){
  // Chair faces the bench.
  R(148,113,29,18,edge);R(150,112,25,16,'#6a8c78');R(152,113,21,3,'#92a58a');R(149,128,27,3,'#587663');R(158,131,7,7,dark);R(144,136,32,4,edge);R(146,135,29,3,'#799680');
  R(157,140,5,9,edge);R(149,148,21,2,edge);R(146,149,6,3,line);R(167,149,6,3,line);
+ drawGear(R,appearance.gear);
  const positions=[80,122,221];
  slots.forEach((id,i)=>{
    if(id)drawItem(q,id,positions[i],103,1.45,true);
