@@ -201,7 +201,7 @@ function paintReviews(day){
  $('daily-review-quests').innerHTML='<div class="running-label daily-heading">복습 퀘스트 <span>'+progress+'</span></div>'+
    (remaining.length?remaining.map(r=>reviewRow(r)).join(''):'<p class="review-empty">'+empty+'</p>');
  const active=state.quests.filter(q=>q.status!=='done').length;
- $('active-counter').textContent='진행 '+(active+remaining.length);
+ planner.paint(day,active+remaining.length);
  const limit=state.reviewLimit??reviewSchedule.defaultLimit;
  $('review-board').innerHTML='<div class="review-footer"><span>복습 XP '+rows.reduce((sum,r)=>sum+r.xp,0)+'</span>'+
    b('하루 '+limit+'문제 · 설정','review-settings','textbtn')+
@@ -480,12 +480,22 @@ function redraw(next){
  if(currentChanged){modal.close();toast('다른 기기의 퀘스트 기록을 반영했어요.');}
  state=next;render();
 }
+const planner=createPlanner({getState:()=>state, show, toast, escapeHTML,
+ async commit(change){
+   refreshGuestForReview();
+   const previous=state, next={...state}, uid=pixelAccount.uid;
+   change(next);state=next;
+   try{if(!await save(true))throw Error('일정을 저장하지 못했어요.');}
+   catch(err){if(uid===pixelAccount.uid && state===next)state=previous;throw err;}
+   if(uid===pixelAccount.uid)render();
+ }
+});
 pixelAccount.init({
  readGuest:pixelAccountGuest,
  claimGuest: guest=>{if(storedValue(key)===JSON.stringify(guest)){localStorage.removeItem(key);localStorage.removeItem(previousKey);}},
  guest:()=>{let g;try{g=JSON.parse(storedValue(key));}catch{}redraw(g&&labSave.valid(g)?g:blank());},
  busy:v=>{document.querySelector('main').inert=v;document.querySelector('header').inert=v;},
- closeAccount:()=>{if(modal.open)modal.close();toast('');redraw(blank());},
+ closeAccount:()=>{planner.reset();if(modal.open)modal.close();toast('');redraw(blank());},
  apply:redraw,alert:toast,
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });
