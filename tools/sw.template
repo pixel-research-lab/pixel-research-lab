@@ -1,0 +1,36 @@
+const prefix = 'pixel-research-lab:' + self.registration.scope + ':';
+const cacheName = prefix + 'BUILD_HASH';
+const assetNames = ASSET_LIST;
+const urls = assetNames.map(file => new URL(file, self.registration.scope).href);
+const entry = new URL('index.html', self.registration.scope).href;
+const directory = new URL(self.registration.scope);
+
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(cacheName);
+    await cache.addAll(urls.map(url => new Request(url, {cache:'reload'})));
+  })());
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    for (const key of await caches.keys()) {
+      if (key.startsWith(prefix) && key !== cacheName) await caches.delete(key);
+    }
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== directory.origin) return;
+  const path = url.origin + url.pathname;
+  const isEntry = event.request.mode === 'navigate' && (path === directory.href || path === entry);
+  if (!isEntry && !urls.includes(path)) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(cacheName);
+    const saved = await cache.match(isEntry ? entry : path);
+    return saved || fetch(event.request);
+  })());
+});
