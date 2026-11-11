@@ -126,7 +126,7 @@ function createPlanner({getState, commit, show, toast, escapeHTML:esc}) {
     const edit=pending().find(w=>w.event.key===key);
     show('일정 퀘스트',e.title,'<div id="planner-detail" data-key="'+key+'"><p>'+dates+' · '+
       (e.allDay?'종일':time(e.start)+' – '+time(e.end))+' · '+esc(e.calendar?choice()?.name:'연구실 일정')+'</p>'+
-      '<div class="actions">'+action('complete',done?'완료 취소':'퀘스트 완료',key,'primary')+
+      '<div class="actions">'+action('complete',done?'완료 취소':getState().agendaClaims?.[key]?'다시 완료':'퀘스트 완료 · +'+studio.agendaPay+' token',key,'primary')+
       action('star',star?'★ 중요 해제':'☆ 중요 표시',key)+
       ((!e.calendar||choice()?.writable)?action('edit','일정 수정',key):'')+
       action('month','달력 보기',start,'textbtn')+'</div>'+
@@ -320,9 +320,13 @@ function createPlanner({getState, commit, show, toast, escapeHTML:esc}) {
       if(!currentEvent())return;
       const field=name==='complete'?'agendaDone':'agendaStars';
       const uid=owner(),value=!getState()[field]?.[arg];
-      await commit(s=>{s[field]={...s[field],[arg]:value};});
+      const first=name==='complete' && value && !getState().agendaClaims?.[arg];
+      await commit(s=>{
+        s[field]={...s[field],[arg]:value};
+        if(name==='complete')s.agendaClaims={...s.agendaClaims,[arg]:true};
+      });
       if(owner()!==uid)return;
-      if(name==='complete' && value){$('modal').close();toast('일정 퀘스트를 완료했어요.');}
+      if(name==='complete' && value){$('modal').close();toast('일정 퀘스트 완료'+(first?' · +'+studio.agendaPay+' token':''));}
       paint();break;
     }
     case 'connections':connections();break;

@@ -1,8 +1,11 @@
 // Each quest earns one reward. Completing it on two devices still produces one entry.
 export const emptyLab = () => ({version:1,field:'',showOffer:false,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 const phase = {ready:1, active:2, done:3};
+const studioRecords = {buy:'purchases',fit:'fittings',axis:'skillDefs',claim:'agendaClaims'};
 export function parts(state) {
   const entries = new Map();
+  for (const [prefix,field] of Object.entries(studioRecords))
+    for (const [key,value] of Object.entries(state[field] || {})) entries.set(prefix+'~'+key,value);
   const extras = {...state.inventory};
   if (state.calendarChoice !== undefined) entries.set('calendarChoice',state.calendarChoice);
   for (const event of state.agendaEvents || []) entries.set('agenda~'+event.key,event);
@@ -59,6 +62,8 @@ export function materialize(rows) {
   const attempts = new Map();
   for (const row of rows) {
     const {id,value}=row;
+    const [prefix,key] = id.split('~');
+    if (Object.hasOwn(studioRecords,prefix)) (state[studioRecords[prefix]] ??= {})[key]=value;
     if (id.startsWith('review~')) state.reviews.push({...value, attempts:[]});
     if (id.startsWith('grade~')) {
       const cardId = id.split('~')[1];
