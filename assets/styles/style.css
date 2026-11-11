@@ -34,6 +34,10 @@ dialog{background:var(--paper);border:2px solid var(--deep);border-radius:5px;co
 
 .review-heading{border-top:1px solid var(--line);background:#f6f1df}
 #review-board,#review-records{padding:0 15px}
+.daily-heading{display:flex;justify-content:space-between;align-items:center}
+.daily-heading span{font-size:12px;font-weight:400;color:var(--sub)}
+.review-footer{flex-wrap:wrap;column-gap:8px}
+#review-limit{display:block;width:8em;padding:6px 8px;margin-top:5px;border:1px solid var(--line)}
 .review-row{display:flex;justify-content:space-between;width:100%;align-items:center;text-align:left}
 .review-row>span:first-child{min-width:0}.review-row strong,.upcoming-review p,.review-answer p,.review-guess p{white-space:pre-wrap;overflow-wrap:anywhere}
 .review-empty{color:var(--sub);padding:14px 0 5px;font-size:14px}

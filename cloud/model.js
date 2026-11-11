@@ -4,6 +4,8 @@ const phase = {ready:1, active:2, done:3};
 export function parts(state) {
   const entries = new Map();
   const extras = {...state.inventory};
+  if (state.reviewLimit !== undefined) entries.set('reviewLimit', state.reviewLimit);
+  if (state.reviewDraw) entries.set('reviewDraw', state.reviewDraw);
   for (const event of state.attendance || []) entries.set('time~'+event.id,event);
   for (const {attempts, ...card} of state.reviews || []) {
     entries.set('review~'+card.id,card);
@@ -29,6 +31,12 @@ export function changes(before, after, seed=false) {
 }
 export function compare(a,b) {
   if (!b) return 1;
+  if (a.id === 'reviewDraw') {
+    // Keep the newest study day; within it the first draw wins across offline devices.
+    if (a.value.day !== b.value.day) return a.value.day > b.value.day ? 1 : -1;
+    // Guest imports use a synthetic record clock; compare the actual draw time.
+    if (a.value.createdAt !== b.value.createdAt) return b.value.createdAt - a.value.createdAt;
+  }
   if (a.id.startsWith('grade~')) {
     // Keep the first day this turn was answered. On a same-day disagreement, schedule another review.
     if (a.value.day !== b.value.day) return a.value.day < b.value.day ? 1 : -1;
@@ -55,6 +63,8 @@ export function materialize(rows) {
     if (id.startsWith('time~')) state.attendance.push(value);
     if (id.startsWith('gift~')) gift[id.slice(5)]=value;
     if (id.startsWith('slot~')) slots[Number(id.slice(5))]=row;
+    if (id === 'reviewLimit') state.reviewLimit = value;
+    if (id === 'reviewDraw') state.reviewDraw = value;
     if (id==='field') state.field=value;
     if (id==='board') Object.assign(state,value);
   }

@@ -11,6 +11,8 @@ const labSave = (() => {
     if ('field' in s && (typeof s.field !== 'string' || s.field.length > 60)) return false;
     if ('showOffer' in s && typeof s.showOffer !== 'boolean') return false;
     if ('reviews' in s && !reviewSchedule.valid(s.reviews)) return false;
+    if ('reviewLimit' in s && !reviewSchedule.validLimit(s.reviewLimit)) return false;
+    if ('reviewDraw' in s && !reviewSchedule.validDraw(s.reviewDraw)) return false;
     if ('attendance' in s && !attendance.valid(s.attendance)) return false;
     for (const [id, count] of Object.entries(s.inventory)) {
       if (!knownItem(id) || !Number.isSafeInteger(count) || count < 0) return false;
