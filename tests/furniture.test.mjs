@@ -8,7 +8,7 @@ const {studio,furniture}=runInNewContext(code+'\n;({studio,furniture})');
 test('legacy equipment persists and returning to a room restores its local finish and coordinates',()=>{
  const base={...emptyLab(),quests:Array.from({length:15},(_,i)=>({id:'q'+i,status:'done',track:'read',difficulty:'hard',loot:'mug'}))};
  function equip(s,sku){studio.equip(s,sku,crypto.randomUUID(),Date.now());}
- equip(base,'dual');base.fittings.gear='dual';delete base.roomLooks;
+ equip(base,'dual');base.fittings={gear:'dual'};delete base.roomLooks;
  equip(base,'river');equip(base,'mint-audio');const balance=studio.wallet(base).balance;
  base.placements={'river-speaker':{x:72,y:103}};
  equip(base,'studio');assert.equal(studio.wallet(base).fitted.speaker,'house-audio');
