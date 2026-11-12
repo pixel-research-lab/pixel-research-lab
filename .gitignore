@@ -1,3 +1,7 @@
 node_modules/
 firebase-debug*.log
 .firebase/
+
+.wrangler/
+slack-cloud/public/
+.dev.vars*
