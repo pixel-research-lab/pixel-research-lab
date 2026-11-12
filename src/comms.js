@@ -22,7 +22,8 @@ function createComms({get,show,commit,toast,owner,esc}){
     openLink.hidden=!n?.url;read.hidden=!n;
     if(n?.url)openLink.href=n.url;else openLink.removeAttribute('href');
     openLink.dataset.id=read.dataset.id=id||'';
-    $('home-slack-connect').hidden=receiver.paired;
+    const connectButton=$('home-slack-connect');connectButton.hidden=receiver.paired&&!receiver.retrying;
+    connectButton.textContent=receiver.retrying?'다시 연결':'수신기 연결';
   }
   toggle.addEventListener('change',async()=>{
     const enabled=toggle.checked;toggle.disabled=true;
@@ -112,7 +113,7 @@ function createComms({get,show,commit,toast,owner,esc}){
     try{
       if(act==='open')open();
       if(act==='help')help();
-      if(act==='home-connect')connect(true);
+      if(act==='home-connect'){if(receiver.retrying)receiver.retry();else connect(true);}
       if(act==='add' || act==='edit')form(id);
       if(act==='connect'){if(!$('comms-inbox'))open();connect();}
       if(act==='disconnect'){receiver.disconnect();open();}

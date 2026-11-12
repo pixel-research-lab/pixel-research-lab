@@ -73,7 +73,7 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42
   const fresh=again.locator('#home-slack-text');await fresh.filter({hasText:'새 알림이 없어요.'}).waitFor();
   mode=503;await again.evaluate(()=>window.dispatchEvent(new Event('online')));await fresh.filter({hasText:'다시 연결'}).waitFor();
   mode=200;events.push({id:'TTEST_EvC',label:'#다시연결',kind:'channel',at:Date.now(),url:'https://app.slack.com/client/TTEST/CBOARD'});
-  await again.evaluate(()=>window.dispatchEvent(new Event('online')));await fresh.filter({hasText:'#다시연결'}).waitFor();
+  await again.getByRole('button',{name:'다시 연결',exact:true}).click();await fresh.filter({hasText:'#다시연결'}).waitFor();
   await again.locator('#home-slack-read').click();mode=401;
   await again.evaluate(()=>window.dispatchEvent(new Event('online')));await again.locator('#home-slack-connect').waitFor();
   assert.equal(await again.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('pixel-slack-device:'))),false);

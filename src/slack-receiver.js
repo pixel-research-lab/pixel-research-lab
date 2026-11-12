@@ -45,6 +45,6 @@ function createSlackReceiver({owner,onRows,onChange}){
   window.addEventListener('online',wake);window.addEventListener('pageshow',wake);window.addEventListener('focus',wake);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake();});
   window.addEventListener('storage',e=>{if(e.key===prefix+owner()||e.key===null){reset();restore();onChange();}});
-  return {restore,reset,disconnect,pair:code=>valid(code)?start(code,false):Promise.resolve(false),
+  return {restore,reset,disconnect,retry:wake,get retrying(){return !!slot?.verified && slot.failures>0;},pair:code=>valid(code)?start(code,false):Promise.resolve(false),
     get paired(){return !!slot?.verified;},get status(){return status;}};
 }
