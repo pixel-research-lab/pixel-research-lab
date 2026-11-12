@@ -56,7 +56,7 @@ globalThis.labFiles ??= (() => {
     if(map===undefined)return true;
     return !!map && typeof map==='object' && !Array.isArray(map) && Object.entries(map).every(([id,r])=>
       uuid.test(id) && r?.id===id && typeof r.parent==='string' && /^[a-zA-Z0-9_-]+$/.test(r.parent) &&
-      ['quest','prompt','answer'].includes(r.section) && typeof r.sha==='string' && /^[a-f0-9]{64}$/.test(r.sha) &&
+      ['quest','prompt','answer','note'].includes(r.section) && typeof r.sha==='string' && /^[a-f0-9]{64}$/.test(r.sha) &&
       typeof r.name==='string' && r.name.length>0 && r.name.length<=255 && Object.hasOwn(formats,r.type) &&
       Number.isSafeInteger(r.size) && r.size>0 && r.size<=maxSize && (r.removed===undefined||r.removed===true));
   }

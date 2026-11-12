@@ -8,7 +8,7 @@ const labSave = (() => {
     if (!object(s) || s.version !== 1 || !Array.isArray(s.quests) || !object(s.inventory) ||
         !Array.isArray(s.slots) || s.slots.length !== 3 || !offerIndex(s.offer) ||
         !Array.isArray(s.seenOffers) || !s.seenOffers.every(offerIndex)) return false;
-    if (!labCalendar.validState(s)) return false;
+    if (!labCalendar.validState(s) || !libraryData.valid(s)) return false;
     if ('field' in s && (typeof s.field !== 'string' || s.field.length > 60)) return false;
     if ('showOffer' in s && typeof s.showOffer !== 'boolean') return false;
     if ('reviews' in s && !reviewSchedule.valid(s.reviews)) return false;
