@@ -42,7 +42,7 @@ function render(){
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- materials.paint();studioUI.paint();reviewDay=null;resetClockView();
+ materials.paint();materials.paintInline();studioUI.paint();reviewDay=null;resetClockView();
 }
 let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
 let writingShift=false;
@@ -125,9 +125,9 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCloc
 window.addEventListener('pageshow',updateClock);
 function changeTab(isHome){home=isHome;if(modal.open)modal.close();render();window.scrollTo({top:0});}
 function show(context,title,body){
- currentReview=null;
+ currentReview=null;delete modal.dataset.questId;richEditor.dispose(modal);materials.clearInline();
  $('dialog-context').textContent=context;$('modal-body').innerHTML='<div class="modal-content"><h2 id="dialog-name">'+escapeHTML(title)+'</h2>'+body+'</div>';
- materials.paint($('modal-body'));modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;
+ materials.paint($('modal-body'));modal.setAttribute('aria-labelledby','dialog-name');if(!modal.open)modal.showModal();modal.scrollTop=0;modal.querySelectorAll('.rich-editor').forEach(richEditor.mount);materials.paintInline();
 }
 function fieldForm(){
  show('내 연구실','연구 분야 설정','<form id="field-form"><label class="field">연구 분야<input type="text" id="field-name" maxlength="60" placeholder="예: 천문학, 생태학, VLM" value="'+escapeHTML(state.field||'')+'"></label><button class="primary" type="submit">저장</button></form>');
@@ -153,23 +153,26 @@ function make(question,track,skill,title='',focusSkill=studio.axes(state).find(x
  const q={id,question,track,skill,title,focusSkill,difficulty,status:'ready',created:Date.now()};return q;
 }
 function newForm(){
- show(state.field||'퀘스트 보드','새 퀘스트','<form id="register-form"><label class="field">알아내고 싶은 질문<textarea id="question" maxlength="260" required placeholder="예: 비교 조건 하나를 바꾸면 관찰 결과도 달라질까?"></textarea></label><label class="field">키울 스킬<select id="track">'+studioUI.optionList()+'</select></label><label class="field">연습 항목<select id="skill"></select></label><label class="field">난이도 · 완료 보상<select id="difficulty"><option value="easy">가벼움 · 15 token</option><option value="standard" selected>보통 · 30 token</option><option value="hard">도전 · 60 token</option></select></label>'+materials.picker('quest')+'<button class="primary" type="submit">질문 등록</button></form>');
+ show(state.field||'퀘스트 보드','새 퀘스트','<form id="register-form">'+richEditor.field('quest')+'<label class="field">키울 스킬<select id="track">'+studioUI.optionList()+'</select></label><label class="field">연습 항목<select id="skill"></select></label><label class="field">난이도 · 완료 보상<select id="difficulty"><option value="easy">가벼움 · 15 token</option><option value="standard" selected>보통 · 30 token</option><option value="hard">도전 · 60 token</option></select></label>'+materials.picker('quest')+'<button class="primary" type="submit">질문 등록</button></form>');
  const base=()=>studio.axes(state).find(x=>x.id===$('track').value)?.base || 'read';
  const options=()=>{$('skill').innerHTML=tFor(base()).skills.map((s,i)=>'<option value="'+i+'">'+s+'</option>').join('')};options();$('track').onchange=options;
- $('register-form').onsubmit=e=>{e.preventDefault();const field=$('question');if(!field.value.trim()){field.setCustomValidity('질문을 입력해 주세요.');field.reportValidity();return;}
- const q=make(field.value.trim(),base(),Number($('skill').value),'',$('track').value||null,$('difficulty').value);saveWithFiles(e.currentTarget,q.id,s=>{s.quests=[...s.quests,q];},()=>quest(q.id));};$('question').oninput=e=>e.target.setCustomValidity('');$('question').focus();
+ $('register-form').onsubmit=e=>{e.preventDefault();const form=e.currentTarget,doc=richEditor.get(form,'quest');if(!doc)return;
+ const q=make(doc.summary,base(),Number($('skill').value),'',$('track').value||null,$('difficulty').value);q.questionBody=doc.blocks;
+ saveWithFiles(form,q.id,s=>{s.quests=[...s.quests,q];},()=>quest(q.id),doc.files);};$('question').focus();
 }
-async function saveWithFiles(form,parent,change,after){
+async function saveWithFiles(form,parent,change,after,inlineFiles=[]){
  const button=form.querySelector('[type="submit"]');
  if(button.disabled)return;
- const identity=fileOwner();button.disabled=true;
+ const identity=fileOwner();button.disabled=true;form.inert=true;
  try{
-   const refs=await materials.collect(form,parent,identity);
+   const refs=await materials.collect(form,parent,identity,inlineFiles);
    if(identity!==fileOwner() || !modal.open || !form.isConnected)return;
    await commit(s=>{change(s);materials.attach(s,refs);});
    if(identity===fileOwner() && modal.open && form.isConnected)after();
- }catch(err){if(identity===fileOwner())toast(err.message||'기기에 저장하지 못했어요.');}
- finally{button.disabled=false;}
+ }catch(err){if(identity===fileOwner()){
+   const error=form.querySelector('.rich-error');if(error){error.textContent=err.message||'기기에 저장하지 못했어요.';error.scrollIntoView({block:'nearest'});}
+   else toast(err.message||'기기에 저장하지 못했어요.');}}
+ finally{button.disabled=false;form.inert=false;}
 }
 let currentReview=null, savingReview=false;
 function reviewById(id){return (state.reviews||[]).find(card=>card.id===id);}
@@ -264,39 +267,43 @@ function upcomingReviews(){
 function refreshGuestForReview(){
  if(pixelAccount.uid)return;
  const latest=pixelAccountGuest();
- if(latest && labSave.valid(latest))state=latest;
+ if(latest && labSave.valid(latest)){
+   // An open quest form keeps its quest object while independent file settings change.
+   reconcileQuests(latest);
+   state=latest;
+ }
 }
 function newReview(){
- show('복습 관리','복습 등록','<form id="review-form"><label class="field">질문<textarea id="review-question" required maxlength="500" placeholder="예: 이 실험에서 대조군을 둔 이유는 무엇일까?"></textarea></label>'+
-  materials.picker('prompt')+'<label class="field">기억하고 싶은 답<textarea id="review-answer" required maxlength="4000"></textarea></label>'+
+ show('복습 관리','복습 등록','<form id="review-form">'+richEditor.field('prompt')+
+  materials.picker('prompt')+richEditor.field('answer')+
   materials.picker('answer')+'<label class="field">연결할 스킬<select id="review-focus">'+studioUI.optionList('',true)+'</select></label>'+
   '<p class="muteline">내일부터 오늘의 퀘스트 추첨에 들어가요. 문제를 열면 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
  const form=$('review-form');
- form.oninput=e=>e.target.setCustomValidity('');
  form.onsubmit=async e=>{
   e.preventDefault();if(savingReview)return;
-  for(const field of [$('review-question'),$('review-answer')]){
-   if(!field.value.trim()){field.setCustomValidity('내용을 입력해 주세요.');field.reportValidity();return;}
-  }
-  const card={id:crypto.randomUUID(),question:$('review-question').value.trim(),answer:$('review-answer').value.trim(),
+  const prompt=richEditor.get(form,'prompt');if(!prompt)return;
+  const answer=richEditor.get(form,'answer');if(!answer)return;
+  const card={id:crypto.randomUUID(),question:prompt.summary,answer:answer.summary,questionBody:prompt.blocks,answerBody:answer.blocks,
     focusSkill:$('review-focus').value||null,firstDue:reviewSchedule.addDays(reviewSchedule.today(),1),attempts:[]};
   await saveWithFiles(form,card.id,s=>{s.reviews=[...(s.reviews||[]),card];},()=>{
     modal.close();toast(reviewDate(card.firstDue)+'부터 복습 퀘스트로 뽑힐 수 있어요.');
-  });
+  },[...prompt.files,...answer.files]);
  };
  $('review-question').focus();
 }
+function promptBlock(card){return richBody.view(card.questionBody,card.id,'prompt')+materials.section(card.id,'prompt',false);}
+function reviewTitle(card){return card.questionBody?'복습 질문':card.question;}
 function openReview(id){
  const card=reviewById(id);if(!card)return;
  const {due,streak,finished}=reviewSchedule.progress(card);
  if(finished){reviewRecord(id);return;}
  const day=reviewSchedule.today();
  if(!dailyDraw(day).ids.includes(id) || due>day){render();return;}
- show('오늘의 복습 · '+streak+' / 4 연속 정답',card.question,materials.section(id,'prompt',false)+'<label class="field">떠올린 답 <small>(선택)</small><textarea id="recall" maxlength="4000" placeholder="말로 떠올리거나 여기에 적어 보세요."></textarea></label>'+
+ show('오늘의 복습 · '+streak+' / 4 연속 정답',reviewTitle(card),promptBlock(card)+'<label class="field">떠올린 답 <small>(선택)</small><textarea id="recall" maxlength="4000" placeholder="말로 떠올리거나 여기에 적어 보세요."></textarea></label>'+
   '<div class="actions">'+b('답 확인','compare-review','primary')+b('모르겠다','grade-no')+'</div>');
  currentReview={id,due,day};
 }
-function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span><p>'+escapeHTML(card.answer)+'</p></div>'+materials.section(card.id,'answer',false);}
+function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span>'+(richBody.view(card.answerBody,card.id,'answer')||'<p>'+escapeHTML(card.answer)+'</p>')+'</div>'+materials.section(card.id,'answer',false);}
 function currentTurn(){
  const round=currentReview,card=round && reviewById(round.id);
  const day=reviewSchedule.today();
@@ -308,7 +315,7 @@ function currentTurn(){
 function compareReview(){
  const turn=currentTurn();if(!turn)return;
  const {round,card}=turn, guess=$('recall').value.trim();
- show('오늘의 복습 · 답 비교',card.question,(guess?'<div class="review-guess"><small>떠올린 답</small><p>'+escapeHTML(guess)+'</p></div>':'')+
+ show('오늘의 복습 · 답 비교',reviewTitle(card),promptBlock(card)+(guess?'<div class="review-guess"><small>떠올린 답</small><p>'+escapeHTML(guess)+'</p></div>':'')+
   answerBlock(card)+'<div class="actions">'+b('맞혔다','grade-yes','primary')+b('모르겠다','grade-no')+'</div>');
  currentReview=round;
 }
@@ -329,7 +336,7 @@ async function gradeReview(correct){
   if(!after){modal.close();return;}
   const [next]=dailyReviews(reviewSchedule.today()).remaining;
   const delta=after.xp-before.xp, heading=after.finished?'복습 완료 · 4회 연속 정답':after.streak?'연속 정답 '+after.streak+' / 4':'다시 복습';
-  show(heading,card.question,answerBlock(saved)+'<p class="skill-result">'+
+  show(heading,reviewTitle(saved),promptBlock(saved)+answerBlock(saved)+'<p class="skill-result">'+
    (after.finished?'연구 일지의 완료한 복습에 남겼어요.':'다음 복습 · '+reviewDate(after.due))+
    (after.correctTurns>before.correctTurns?' · +'+studio.reviewPay+' token':'')+(delta>0?' · 복습 XP +'+delta:'')+'</p><div class="actions">'+(next?b('다음 질문','review','primary',next.card.id):'')+b('닫기','close')+'</div>');
  }catch{
@@ -343,21 +350,23 @@ async function gradeReview(correct){
 function reviewRecord(id){
  const card=reviewById(id);if(!card)return;
  const progress=reviewSchedule.progress(card);if(!progress.finished)return;
- show('완료한 복습 · '+reviewDate(progress.finished),card.question,materials.section(id,'prompt',false)+answerBlock(card)+
+ show('완료한 복습 · '+reviewDate(progress.finished),reviewTitle(card),promptBlock(card)+answerBlock(card)+
   '<p class="skill-result">4회 연속 정답 · 복습 XP '+progress.xp+'</p>'+b('닫기','close'));
 }
 function quest(id){
  const q=find(id);if(!q)return;if(q.status==='done'){record(id);return}
- const t=tFor(q.track),intro='<p class="muteline">'+escapeHTML(questFocus(q))+' · 완료 보상 '+studio.questPay(q)+' token</p><p class="lead">'+escapeHTML(q.title?q.question:'연습 스킬 · '+t.skills[q.skill])+'</p>'+materials.section(id,'quest');
+ const t=tFor(q.track),intro='<p class="muteline">'+escapeHTML(questFocus(q))+' · 완료 보상 '+studio.questPay(q)+' token</p><p class="lead">'+escapeHTML(q.title?q.question:'연습 스킬 · '+t.skills[q.skill])+'</p>'+richBody.view(q.questionBody,q.id,'quest')+materials.section(id,'quest');
  if(q.status==='ready'){
-  show(t.name+' / '+t.skills[q.skill],qTitle(q),intro+'<form id="prediction-form"><label class="field">시작 전 내 예측<textarea id="prediction" maxlength="800" placeholder="아직 감이 안 오면 비워 둬도 돼요.">'+escapeHTML(q.predictionDraft||'')+'</textarea></label><div class="muteline">지금의 생각을 남기면 확인해 볼 도전 카드 한 장이 열려요.</div><button class="primary" type="submit">예측 봉인 · 도전 카드 열기</button></form>');
+  show(t.name+' / '+t.skills[q.skill],q.questionBody?'연구 질문':qTitle(q),intro+'<form id="prediction-form"><label class="field">시작 전 내 예측<textarea id="prediction" maxlength="800" placeholder="아직 감이 안 오면 비워 둬도 돼요.">'+escapeHTML(q.predictionDraft||'')+'</textarea></label><div class="muteline">지금의 생각을 남기면 확인해 볼 도전 카드 한 장이 열려요.</div><button class="primary" type="submit">예측 봉인 · 도전 카드 열기</button></form>');
+  modal.dataset.questId=q.id;
   $('prediction').oninput=e=>{q.predictionDraft=e.target.value;save()};
   $('prediction-form').onsubmit=e=>{e.preventDefault();if(q.status!=='ready')return;q.prediction=$('prediction').value.trim();delete q.predictionDraft;
    const previous=state.quests.filter(x=>x.track===q.track&&x.id!==q.id&&x.card!==undefined).slice(-1)[0]?.card;
    const available=t.cards.map((_,i)=>i).filter(i=>i!==previous);q.card=choose(available);q.status='active';save();render();quest(q.id);};return;
  }
  const card=t.cards[q.card];
- show(t.name+' / '+t.skills[q.skill],qTitle(q),intro+'<dl class="record"><dt>봉인한 예측</dt><dd>'+escapeHTML(q.prediction||'예측 보류')+'</dd></dl><div class="card-note"><span class="mini-label">공개된 도전 카드</span><h3>'+card[0]+'</h3><p>'+card[1]+'</p></div><form id="finish-form"><label class="field">관찰과 근거<textarea id="finding" required maxlength="2000" placeholder="무엇을 봤나요? 숫자, 그림 번호 또는 구체적 사례를 하나 남기세요.">'+escapeHTML(q.draft?.finding||'')+'</textarea></label><label class="field">결과<select id="verdict">'+(q.prediction?['예상과 같았다','예상과 달랐다','판단을 보류했다']:['새로운 점을 관찰했다','판단을 보류했다']).map(x=>'<option>'+x+'</option>').join('')+'</select></label><label class="field">이번에 어떻게 수행했나요?<select id="mastery"><option value="1">예시나 도움을 받아 수행 · 견습</option><option value="2">혼자 수행 · 독립</option><option value="3">다른 문제에 적용 · 응용</option></select></label><button class="primary" type="submit">연구 기록하고 보상 받기</button></form>');
+ show(t.name+' / '+t.skills[q.skill],q.questionBody?'연구 질문':qTitle(q),intro+'<dl class="record"><dt>봉인한 예측</dt><dd>'+escapeHTML(q.prediction||'예측 보류')+'</dd></dl><div class="card-note"><span class="mini-label">공개된 도전 카드</span><h3>'+card[0]+'</h3><p>'+card[1]+'</p></div><form id="finish-form"><label class="field">관찰과 근거<textarea id="finding" required maxlength="2000" placeholder="무엇을 봤나요? 숫자, 그림 번호 또는 구체적 사례를 하나 남기세요.">'+escapeHTML(q.draft?.finding||'')+'</textarea></label><label class="field">결과<select id="verdict">'+(q.prediction?['예상과 같았다','예상과 달랐다','판단을 보류했다']:['새로운 점을 관찰했다','판단을 보류했다']).map(x=>'<option>'+x+'</option>').join('')+'</select></label><label class="field">이번에 어떻게 수행했나요?<select id="mastery"><option value="1">예시나 도움을 받아 수행 · 견습</option><option value="2">혼자 수행 · 독립</option><option value="3">다른 문제에 적용 · 응용</option></select></label><button class="primary" type="submit">연구 기록하고 보상 받기</button></form>');
+ modal.dataset.questId=q.id;
  if(q.draft){$('verdict').value=q.draft.verdict;$('mastery').value=q.draft.mastery;}
  const draft=()=>{q.draft={finding:$('finding').value,verdict:$('verdict').value,mastery:$('mastery').value};save()};
  $('finish-form').oninput=e=>{if(e.target.id==='finding')e.target.setCustomValidity('');draft()};$('finish-form').onchange=draft;
@@ -368,8 +377,8 @@ function quest(id){
 function itemBox(i){return '<div class="reward">'+sprite(i)+'<div><h3>'+lootDefs[i][0]+'</h3><p>'+lootDefs[i][1]+'</p></div></div>'}
 function reward(q){const skill=tFor(q.track).skills[q.skill],a=q.rankBefore,z=q.rankAfter;
  show('퀘스트 완료','연구 성과를 획득했어요',itemBox(q.loot)+'<p class="skill-result"><b>+'+studio.questPay(q)+' token</b><br>'+escapeHTML(questFocus(q))+' · <strong>'+skill+'</strong> · 경험 +1<br>'+(a===z?ranks[z]+' 단계':ranks[a]+' → '+ranks[z])+'</p><div class="actions">'+b('책상에 놓기','place-loot','primary',q.loot)+b('연구 일지 보기','record','secondary',q.id)+'</div>');}
-function record(id){const q=find(id);if(!q||q.status!=='done')return;const t=tFor(q.track);show('연구 일지 / '+new Date(q.ended).toLocaleDateString('ko-KR'),qTitle(q),
- '<dl class="record">'+[['질문',q.question],['시작 전 예측',q.prediction||'예측 보류'],['도전 카드',t.cards[q.card].join(' · ')],['결과',q.verdict],['관찰과 근거',q.finding],['연결한 스킬',questFocus(q)],['획득한 token',String(studio.questPay(q))],['성장',t.skills[q.skill]+' · 경험 +1 · '+ranks[q.rankAfter]]].map(([k,v])=>'<dt>'+k+'</dt><dd>'+escapeHTML(v)+'</dd>').join('')+'</dl>'+materials.section(id,'quest')+itemBox(q.loot)+b('일지 목록','journal','secondary'));}
+function record(id){const q=find(id);if(!q||q.status!=='done')return;const t=tFor(q.track);show('연구 일지 / '+new Date(q.ended).toLocaleDateString('ko-KR'),q.questionBody?'완료한 연구':qTitle(q),
+ richBody.view(q.questionBody,q.id,'quest')+'<dl class="record">'+[...(q.questionBody?[]:[['질문',q.question]]),['시작 전 예측',q.prediction||'예측 보류'],['도전 카드',t.cards[q.card].join(' · ')],['결과',q.verdict],['관찰과 근거',q.finding],['연결한 스킬',questFocus(q)],['획득한 token',String(studio.questPay(q))],['성장',t.skills[q.skill]+' · 경험 +1 · '+ranks[q.rankAfter]]].map(([k,v])=>'<dt>'+k+'</dt><dd>'+escapeHTML(v)+'</dd>').join('')+'</dl>'+materials.section(id,'quest')+itemBox(q.loot)+b('일지 목록','journal','secondary'));}
 function skillSheet(id){const t=tFor(id);show('스킬 수첩',t.name,'<p>'+t.hint+'</p>'+t.skills.map((s,i)=>{const {xp,rank}=stats(id,i);return '<div class="progress-line"><strong>'+s+'</strong><span>'+ranks[rank]+' · 경험 '+xp+'</span></div>'}).join(''));}
 function desk(item=null){
  selectedLoot=item;
@@ -442,7 +451,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  switch(act){
  case 'studio':studioUI.shop();break;case 'axes':studioUI.settings();break;
  case 'review-files':show('복습 관리','복습 자료 관리',reviewRows().map(r=>b(r.card.question,'edit-review-files','secondary',r.card.id)).join(' '));break;
- case 'edit-review-files':{const c=reviewById(arg);if(c)show('복습 자료 관리',c.question,materials.section(arg,'prompt')+materials.section(arg,'answer')+b('목록','review-files'));break;}
+ case 'edit-review-files':{const c=reviewById(arg);if(c)show('복습 자료 관리',reviewTitle(c),richBody.view(c.questionBody,c.id,'prompt')+materials.section(arg,'prompt')+'<h3>기억하고 싶은 답</h3>'+(richBody.view(c.answerBody,c.id,'answer')||'<p>'+escapeHTML(c.answer)+'</p>')+materials.section(arg,'answer')+b('목록','review-files'));break;}
  case 'new-review':newReview();break;
  case 'review-settings':reviewSettings();break;
  case 'review':openReview(arg);break;
@@ -474,7 +483,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'journal':changeTab(false);break;case 'close':modal.close();break;
  }});
 $('home-tab').onclick=()=>changeTab(true);$('journal-tab').onclick=()=>changeTab(false);
-$('close-modal').onclick=()=>modal.close();modal.addEventListener('close',()=>{removeMode=false;});
+$('close-modal').onclick=()=>modal.close();modal.addEventListener('close',()=>{removeMode=false;if(!modal.open){richEditor.dispose(modal);materials.clearInline();}});
 window.addEventListener('storage',e=>{
  if(pixelAccount.uid || e.key!==key||!e.newValue)return;
  try{const updated=JSON.parse(e.newValue);if(!labSave.valid(updated))return;
@@ -489,7 +498,7 @@ function accountPanel(){
  show('내 연구실','계정 동기화',info);
  if($('account-state'))$('account-state').textContent=account.status;
 }
-function redraw(next){
+function reconcileQuests(next){
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const oldById=new Map(state.quests.map(q=>[q.id,q]));
  let currentChanged=false;
@@ -497,10 +506,13 @@ function redraw(next){
    const previous=oldById.get(q.id);
    if(!previous)return q;
    if(same(previous,q))return previous;
-   if(modal.open && $('dialog-name')?.textContent===qTitle(previous))currentChanged=true;
+   if(modal.open && (modal.dataset.questId===q.id || $('dialog-name')?.textContent===qTitle(previous)))currentChanged=true;
    return q;
  });
  if(currentChanged){modal.close();toast('다른 기기의 퀘스트 기록을 반영했어요.');}
+}
+function redraw(next){
+ reconcileQuests(next);
  state=next;render();
 }
 async function commit(change){
