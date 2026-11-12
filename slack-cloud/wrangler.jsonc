@@ -28,6 +28,7 @@
   ],
   "vars": {
     "APP_ORIGIN": "https://slack-preview.pixel-research-lab-2e2guk.workers.dev",
+    "PAGES_URL": "https://pixel-research-lab.github.io/pixel-research-lab/",
     "FIREBASE_PROJECT": "pixel-research-lab-2e2guk",
     "SLACK_TEAM": "T0CGYVDNL2J",
     "SLACK_CHANNEL": "C0CGKHCP4PR"

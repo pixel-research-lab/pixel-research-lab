@@ -63,3 +63,35 @@ test('a single Slack approval delivers to both devices of the same Firebase user
 test('Firebase identity never accepts a caller supplied UID or an unsigned token',async()=>{
  for(const auth of ['Bearer uid1','Bearer abc.def.ghi',null])assert.equal(await firebaseUser(new Request('https://lab.example',{headers:auth?{Authorization:auth}:{}}),'test'),null);
 });
+
+test('Pages can use the authenticated API and OAuth returns to the original project path', async () => {
+  const worker = (await import('../slack-cloud/worker.mjs')).default;
+  const env = {
+    DB: database(), APP_ORIGIN: 'https://preview.example', PAGES_URL: 'https://lab.example/project/',
+    SLACK_CLIENT_ID: 'client', CLIENT_SECRET: 'secret', SIGNING_SECRET: 'sign', TOKEN_KEY: 'key',
+    SLACK_APP_ID: 'app', SLACK_TEAM: 'T123'
+  };
+  const api = env.APP_ORIGIN + '/api/slack/';
+  const origin = new URL(env.PAGES_URL).origin;
+  const request = (path, method, caller) => new Request(api+path, {
+    method, headers: {Origin:caller, 'Content-Type':'application/json'}, ...(method==='POST'?{body:'{}'}:{})
+  });
+  const preflight = await worker.fetch(request('feed','OPTIONS',origin),env,{});
+  assert.equal(preflight.status,204);
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),origin);
+  const guest = await worker.fetch(request('feed','GET',origin),env,{});
+  assert.equal(guest.status,401);
+  assert.equal(guest.headers.get('Access-Control-Allow-Origin'),origin);
+  const foreign = await worker.fetch(request('feed','OPTIONS','https://unrelated.example'),env,{});
+  assert.equal(foreign.status,403);
+  assert.equal(foreign.headers.get('Access-Control-Allow-Origin'),null);
+  const run = routes({identify:async()=>'researcher'});
+  for (const [caller,home] of [[origin,env.PAGES_URL],[env.APP_ORIGIN,env.APP_ORIGIN+'/']]) {
+    const start = await (await run(request('start','POST',caller),env,{})).json();
+    const oauth = new URL(start.url).searchParams;
+    assert.equal(oauth.get('redirect_uri'),api+'callback');
+    const callback = await run(new Request(api+'callback?code=example&state='+oauth.get('state')),env,{});
+    assert.equal(callback.headers.get('Location').split('#')[0],home);
+    assert.match(callback.headers.get('Location'),/#slack_finish=[a-f0-9]{64}$/);
+  }
+});

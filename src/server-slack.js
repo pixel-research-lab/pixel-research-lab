@@ -1,6 +1,6 @@
 function createServerSlack({onChange,onNotice}){
   const meta=document.querySelector('meta[name="pixel-slack-api"]');
-  if(!meta)return null;
+  if(!meta || (meta.dataset.origin && meta.dataset.origin !== location.origin))return null;
   const endpoint=new URL(meta.content,location.href);
   let current=null,known=false,linked=false,ready=true,status='',items={},timer,sequence=0,pending=false,revision=0;
   const params=new URLSearchParams(location.hash.slice(1));

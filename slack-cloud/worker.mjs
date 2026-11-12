@@ -8,14 +8,15 @@ export const routes=({identify=firebaseUser,call=slack}={})=>async(request,env,c
   const url=new URL(request.url),path=url.pathname.slice(base.length);
   if(!url.pathname.startsWith(base+'/'))return env.ASSETS.fetch(request);
   const db=env.DB, now=Date.now(), origin=env.APP_ORIGIN, callback=origin+base+'/callback';
-  // Always send authorization codes back to the configured preview, never to a URL supplied by a visitor.
+  // The prefix is part of the random state saved at /start. Both return addresses come from deployment settings.
   if(request.method==='GET' && path==='/callback'){
-    const fail=()=>redirect(origin+'/#slack_error=authorization');
     const state=url.searchParams.get('state'),code=url.searchParams.get('code');
-    if(!/^[0-9a-f]{64}$/.test(state)||!code||code.length>1024||url.searchParams.has('error'))return fail();
+    const home=state?.startsWith('pages-') && env.PAGES_URL ? env.PAGES_URL : origin+'/';
+    const fail=()=>redirect(home+'#slack_error=authorization');
+    if(!/^(?:pages-)?[0-9a-f]{64}$/.test(state)||!code||code.length>1024||url.searchParams.has('error'))return fail();
     const ticket=random();
     const res=await db.prepare('UPDATE flows SET ticket=?, code=? WHERE state=? AND expires>? AND ticket IS NULL').bind(ticket,code,state,now).run();
-    return res.meta.changes?redirect(origin+'/#slack_finish='+ticket):fail();
+    return res.meta.changes?redirect(home+'#slack_finish='+ticket):fail();
   }
   if(request.method==='POST' && path==='/events'){
     const raw=await request.text();
@@ -37,7 +38,9 @@ export const routes=({identify=firebaseUser,call=slack}={})=>async(request,env,c
     return json({});
   }
   if(!['/feed','/start','/finish','/read','/disconnect'].includes(path))return json({},404);
-  if(request.headers.get('origin') && request.headers.get('origin')!==origin)return json({},403);
+  const caller=request.headers.get('Origin');
+  const fromPages=Boolean(env.PAGES_URL && caller===new URL(env.PAGES_URL).origin);
+  if(caller && caller!==origin && !fromPages)return json({},403);
   if(request.method!==(path==='/feed'?'GET':'POST'))return json({},405);
   const uid=await identify(request,env.FIREBASE_PROJECT);
   if(!uid)return json({error:'login'},401);
@@ -51,7 +54,7 @@ export const routes=({identify=firebaseUser,call=slack}={})=>async(request,env,c
   let data;try{data=await request.json();}catch{return json({},400);}
   if(path==='/start'){
     if(!env.SLACK_CLIENT_ID||!env.CLIENT_SECRET||!env.SIGNING_SECRET||!env.TOKEN_KEY||!env.SLACK_APP_ID)return json({error:'setup'},503);
-    const state=random(),dm=data?.dm===true;
+    const state=(fromPages?'pages-':'')+random(),dm=data?.dm===true;
     await db.batch([db.prepare('DELETE FROM flows WHERE uid=? OR expires<=?').bind(uid,now),db.prepare('INSERT INTO flows(state,uid,dm,expires) VALUES(?,?,?,?)').bind(state,uid,Number(dm),now+600000)]);
     const params=new URLSearchParams({client_id:env.SLACK_CLIENT_ID,redirect_uri:callback,team:env.SLACK_TEAM,state,user_scope:'channels:read,channels:history'+(dm?',im:history,im:read,users:read':'')});
     return json({url:'https://slack.com/oauth/v2/authorize?'+params});
@@ -87,7 +90,27 @@ export const routes=({identify=firebaseUser,call=slack}={})=>async(request,env,c
 };
 const handle=routes();
 export default {
-  async fetch(request,env,ctx){try{return await handle(request,env,ctx);}catch{return json({error:'retry'},503);}},
+  async fetch(request,env,ctx){
+    const path=new URL(request.url).pathname;
+    const pagesOrigin=env.PAGES_URL && new URL(env.PAGES_URL).origin;
+    const crossOrigin=pagesOrigin && request.headers.get('Origin')===pagesOrigin
+      && ['/feed','/start','/finish','/read','/disconnect'].some(route=>path===base+route);
+    let response;
+    if(crossOrigin && request.method==='OPTIONS'){
+      response=new Response(null,{status:204,headers:{
+        'Access-Control-Allow-Methods':'GET, POST',
+        'Access-Control-Allow-Headers':'Authorization, Content-Type',
+        'Access-Control-Max-Age':'600'
+      }});
+    }else{
+      try{response=await handle(request,env,ctx);}catch{response=json({error:'retry'},503);}
+    }
+    if(crossOrigin){
+      response.headers.set('Access-Control-Allow-Origin',pagesOrigin);
+      response.headers.append('Vary','Origin');
+    }
+    return response;
+  },
   async scheduled(_,env){const now=Date.now();await env.DB.batch([
     env.DB.prepare('DELETE FROM flows WHERE expires<=?').bind(now),
     env.DB.prepare('DELETE FROM inbox WHERE at<?').bind(now-86400000),
