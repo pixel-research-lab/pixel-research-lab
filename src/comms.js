@@ -96,7 +96,7 @@ function createComms({get,show,commit,toast,owner,esc}){
     if(popup && !popup.closed){popup.focus();return;}
     nonce=crypto.randomUUID();identity=owner();
     const fragment=new URLSearchParams({origin:location.origin,nonce});
-    popup=window.open(local+'/pair#'+fragment,'pixelRelay','popup,width=510,height=480');
+    popup=window.open(local+'/pair?open='+Date.now()+'#'+fragment,'pixelRelay','popup,width=510,height=480');
     if(!popup){toast('수신기 연결 창을 열 수 있게 팝업을 허용해 주세요.');return;}
     rememberSession({nonce,identity});paint();
   }
