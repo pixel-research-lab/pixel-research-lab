@@ -16,14 +16,6 @@ test('a pet walks, watches, goes to the desk, naps and comes down without an inp
   assert.equal(seen.size,6);assert.ok(returned);assert.equal(state.y,152);
   assert.equal(Object.keys(pets.kinds).length,7);
 });
-test('context responds to actual work, an incorrect recall, a finished quest and checkout',()=>{
-  const date=new Date(2026,10,12,10),now=date.getTime(),s=emptyLab(),idle={status:'idle',accepted:[]},active={status:'working',accepted:[],since:now};
-  assert.match(pets.remark(s,date,idle,3)[0],/3개/);
-  assert.match(pets.remark(s,date,active,3)[0],/시작/);
-  s.reviews=[{attempts:[{day:'2026-11-12',correct:false,at:now}]}];assert.match(pets.remark(s,date,idle,0)[0],/막힌/);
-  s.quests=[{status:'done',ended:now+1}];assert.match(pets.remark(s,date,idle,0)[0],/1개/);
-  assert.match(pets.remark(s,date,{...idle,accepted:[{at:now,action:'finish'}]},0)[0],/수고/);
-});
 test('file metadata and selected pet merge independently; unlink wins over an older link',()=>{
   const id='ac6d3a12-6672-4107-a968-fe19405443c7',item={id,parent:'q1',section:'quest',name:'원본.pdf',size:7,sha:'a'.repeat(64),type:'application/pdf'};
   const s=emptyLab(),a=changes(s,{...s,materials:{[id]:item}}),b=changes(s,{...s,pet:'calico'});

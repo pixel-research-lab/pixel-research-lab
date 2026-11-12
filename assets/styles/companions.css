@@ -25,12 +25,8 @@
 .file-display{margin-top:12px;text-align:center}.file-display img{max-width:100%;max-height:67vh;object-fit:contain}
 .file-display iframe{display:block;width:100%;height:64vh;border:0}
 @media(max-width:520px){.pet-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pet-strip{align-items:flex-start}.file-field small{display:block}}
-#pet-bubble{position:absolute;z-index:4;max-width:min(190px,53%);width:max-content;transform:translate(-50%,-100%);padding:6px 10px;border:2px solid #655d4e;border-radius:8px;background:#fff9e6;color:#423e37;box-shadow:2px 3px #4d4d4833;font:600 clamp(11px,1.2vw,13px)/1.45 system-ui,sans-serif;text-align:center;word-break:keep-all;pointer-events:none}
-#pet-bubble::after{content:"";position:absolute;bottom:-5px;left:48%;width:7px;height:7px;background:#fff9e6;border-right:2px solid #655d4e;border-bottom:2px solid #655d4e;transform:rotate(45deg)}
-#pet-bubble[hidden],#pet-voice[hidden]{display:none}
-#pet-speech{flex:1}.pet-strip{gap:8px;flex-wrap:wrap}
 .pet-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pet-card canvas{height:70px}
-@media(max-width:520px){#pet-speech{flex-basis:100%}.pet-strip{justify-content:flex-end}.pet-card canvas{height:61px}}
+@media(max-width:520px){.pet-card canvas{height:61px}}
 #room-pet.petted::after{content:"♥";color:#d97b85;text-shadow:1px 1px #fff1d6;position:absolute;right:5%;top:4%;font:bold 13px monospace;pointer-events:none;animation:pet-heart 1.2s ease-out both}
 @keyframes pet-heart{0%{opacity:1;transform:translateY(4px)}100%{opacity:0;transform:translateY(-14px)}}
 @media(prefers-reduced-motion:reduce){#room-pet.petted::after{animation:none;display:none}}

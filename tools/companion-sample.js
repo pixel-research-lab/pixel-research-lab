@@ -1,8 +1,12 @@
 // Only embedded in the standalone playtest, never in the published game.
 async function startPlaytest(hooks){
-  const key='pixel-companion-preview.v1';
+  const key='pixel-workspace-preview.v1';
   if(localStorage.getItem(key)){hooks.guest();return;}
   const today=reviewSchedule.today(),id=crypto.randomUUID();
+  const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
+  const attendance=['start','pause','resume','finish'].map((action,index)=>({
+    id:crypto.randomUUID(),action,at:new Date(yesterday).setHours([9,12,13,18][index],0,0,0)
+  }));
   hooks.busy(true);
   try{
     const materials={};
@@ -23,7 +27,7 @@ async function startPlaytest(hooks){
       materials[fid]={id:fid,parent:id,section:answer?'answer':'prompt',name:answer?'검증-오차-해설.png':'두-오차-곡선.png',...info};
     }
     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({
-      version:1,field:'',showOffer:false,quests:[],attendance:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0],
+      version:1,field:'',showOffer:false,quests:[],attendance,inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0],
       pet:'black',materials,reviews:[{id,question:'그림에서 과적합을 의심할 만한 구간은 어디일까?',answer:'학습 오차는 계속 줄지만 검증 오차가 다시 커지는 뒤쪽 구간이야.',attempts:[],firstDue:today}]}));
   }catch{hooks.alert('예제 자료를 준비하지 못했어요. 직접 파일을 첨부해 볼 수 있어요.');}
   finally{hooks.guest();hooks.busy(false);}

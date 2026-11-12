@@ -32,7 +32,7 @@ def script(match):
         assert "const previewCredit = 0;" in source
         source = source.replace("const previewCredit = 0;", "const previewCredit = 2000;")
     if path == "src/app.js":
-        source = source.replace("pixel-vla-lab.v1", "pixel-companion-preview.v1")
+        source = source.replace("pixel-vla-lab.v1", "pixel-workspace-preview.v1")
         source = source.replace("src=\"./assets/images/'+group+'/'+id+'.png", "src=\"'+previewImages['assets/images/'+group+'/'+id+'.png']+'")
     if path == "src/art.js":
         source = source.replace("'./assets/images/items/' + id + '.png'", "previewImages['assets/images/items/'+id+'.png']")
@@ -44,5 +44,5 @@ page = re.sub(r'(?:src|href)="\./(assets/images/[^"]+)"', lambda m: m[0].split("
 page = page.replace('<body>', '<body><script>const previewImages='+json.dumps(images)+'</script>')
 page = page.replace('id="account-open" class="account-open" data-do="account">로그인', 'id="account-open" class="account-open" disabled>게스트 체험')
 page = re.sub(r'<script src="\./([^"]+)"></script>', script, page)
-page = page.replace("<title>픽셀 연구실 · 나의 연구실</title>","<title>픽셀 연구실 · 반려동물과 연구 자료 체험실</title>")
+page = page.replace("<title>픽셀 연구실 · 나의 연구실</title>","<title>픽셀 연구실 · 출퇴근 기록과 작업실 체험실</title>")
 args.output.write_text(page)
