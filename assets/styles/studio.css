@@ -19,16 +19,17 @@
 .studio-checkout button:disabled{opacity:.6;cursor:default}
 #skill-chart{padding:14px;color:#506453}
 .radar-wrap{display:grid;grid-template-columns:minmax(115px,1fr) minmax(100px,1fr);align-items:center;gap:12px}
-.radar-wrap svg{width:100%;max-height:225px}
+.radar-wrap svg{display:block;width:100%;height:auto}.radar-wrap .label-line{stroke:#b8bfaa}
 .radar-ring{fill:#eff0df;stroke:#a5af96;stroke-width:1}
 .radar-wrap line{stroke:#b6bca9}
 .radar-score{fill:#87ad8299;stroke:#466e55;stroke-width:2}
 .radar-wrap circle{fill:#375f49}
-.radar-wrap text{text-anchor:middle;dominant-baseline:central;font:bold 10px ui-monospace,monospace;fill:#4b6151}
+.radar-wrap text{text-anchor:middle;dominant-baseline:central;font:600 11px var(--body);fill:#4b6151}
 .axis-list{list-style:none;padding:0;margin:0;display:grid;gap:6px}
-.axis-list li,.stat-bar{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;font-size:13px;overflow-wrap:anywhere}
+.axis-list li,.stat-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;font-size:13px;overflow-wrap:anywhere}
 .axis-list b,.stat-bar b{font:600 12px ui-monospace,monospace;white-space:nowrap}
-.axis-key{font:11px ui-monospace,monospace;background:#e6ead6;padding:2px 3px}
+.radar-wrap{grid-template-columns:minmax(0,1.75fr) minmax(90px,1fr)}
+@media(max-width:780px){.radar-wrap{grid-template-columns:1fr}.radar-wrap svg{max-width:400px;margin:auto}}
 .stat-bars{display:grid;gap:10px}
 .stat-bar{grid-template-columns:1fr auto}
 .stat-bar div{grid-column:1/-1;background:#e0e3d2;height:9px}

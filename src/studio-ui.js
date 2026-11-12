@@ -43,17 +43,44 @@ function createStudioUI({getState,show,toast,commit,escapeHTML:esc}){
     const rows=studio.scores(getState()), target=$('skill-chart');
     if(!rows.length){target.textContent='스킬 설정에서 그래프에 표시할 스킬을 골라 주세요.';return;}
     const max=Math.max(1,...rows.map(x=>x.xp));
-    const legend=rows.map((x,i)=>'<li><span class="axis-key">'+(i+1)+'</span>'+esc(x.name)+'<b>'+x.xp+' XP</b></li>').join('');
+    const legend=rows.map(x=>'<li><span>'+esc(x.name)+'</span><b>'+x.xp+' XP</b></li>').join('');
     if(rows.length<=2){
       target.innerHTML='<div class="stat-bars">'+rows.map(x=>'<div class="stat-bar"><span>'+esc(x.name)+'</span><b>'+x.xp+
         ' XP</b><div><i style="width:'+100*x.xp/max+'%"></i></div></div>').join('')+'</div>';return;
     }
-    const xy=(i,r)=>{const a=i*2*Math.PI/rows.length-Math.PI/2;return [100+r*Math.cos(a),100+r*Math.sin(a)].map(v=>v.toFixed(2));};
+    const height=Math.max(236,rows.length*17);
+    const centerY=height/2;
+    const xy=(i,r)=>{
+      const angle=i*2*Math.PI/rows.length-Math.PI/2;
+      return [170+r*Math.cos(angle),centerY+r*Math.sin(angle)];
+    };
     const polygon=f=>rows.map((x,i)=>xy(i,f(x)).join(',')).join(' ');
     const rings=[1,.75,.5,.25].map(f=>'<polygon class="radar-ring" points="'+polygon(()=>72*f)+'"/>').join('');
-    const lines=rows.map((x,i)=>{const [a,b]=xy(i,72);return '<line x1="100" y1="100" x2="'+a+'" y2="'+b+'"/>';}).join('');
-    const labels=rows.map((x,i)=>{const [a,b]=xy(i,86);return '<text x="'+a+'" y="'+b+'">'+(i+1)+'</text>';}).join('');
-    target.innerHTML='<div class="radar-wrap"><svg viewBox="0 0 200 200" role="img" aria-label="'+rows.length+'각형 스킬 그래프">'+rings+lines+
+    const lines=rows.map((x,i)=>{const [a,b]=xy(i,72);return '<line x1="170" y1="'+centerY+'" x2="'+a+'" y2="'+b+'"/>';}).join('');
+    // Keep closely spaced axes legible by distributing each side's labels vertically.
+    const sides=[[],[]];
+    const points=rows.map((row,i)=>{
+      const [x,y]=xy(i,82),side=Math.round(x-170)===0?0:(x>170?1:-1);
+      const point={name:row.name,x,y,side,labelY:y};
+      if(side)sides[side>0?1:0].push(point);
+      else point.labelY=y+(y<centerY?-10:10);
+      return point;
+    });
+    for(const side of sides){
+      side.sort((a,b)=>a.y-b.y);
+      side.forEach((point,i)=>{point.labelY=Math.min(height-20-(side.length-1-i)*30,
+        Math.max(point.y,i?side[i-1].labelY+30:20));});
+    }
+    const labels=points.map(({name,x,y,side,labelY})=>{
+      const chars=Array.from(name),parts=[chars.slice(0,7).join('')];
+      if(chars.length>7)parts.push(chars.slice(7,13).join('')+(chars.length>13?'…':''));
+      const left=side===0?170:side>0?254:86;
+      const leader=side?'<line class="label-line" x1="'+x+'" y1="'+y+'" x2="'+(left-3*side)+'" y2="'+labelY+'"/>':'';
+      return '<g><title>'+esc(name)+'</title>'+leader+'<text style="text-anchor:'+
+        (side===0?'middle':side>0?'start':'end')+'">'+parts.map((part,j)=>
+          '<tspan x="'+left+'" y="'+(labelY+(j-(parts.length-1)/2)*13)+'">'+esc(part)+'</tspan>').join('')+'</text></g>';
+    }).join('');
+    target.innerHTML='<div class="radar-wrap"><svg viewBox="0 0 340 '+height+'" role="img" aria-label="'+rows.length+'각형 스킬 그래프">'+rings+lines+
       '<polygon class="radar-score" points="'+polygon(x=>72*x.xp/max)+'"/>'+rows.map((x,i)=>{const [a,b]=xy(i,72*x.xp/max);return '<circle cx="'+a+'" cy="'+b+'" r="2.5"/>';}).join('')+labels+
       '</svg><ol class="axis-list">'+legend+'</ol></div>';
   }

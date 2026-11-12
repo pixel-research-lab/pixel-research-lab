@@ -49,3 +49,33 @@ dialog{background:var(--paper);border:2px solid var(--deep);border-radius:5px;co
 .brand-art{height:auto;object-fit:contain}.sprite,.skill-icon{object-fit:contain;image-rendering:pixelated}.board-empty{padding:6px 0}.board-empty p{margin:0 0 6px;color:var(--sub)}
 
 .guest-import{display:flex;align-items:center;gap:7px;margin:12px 0}.field input[type="text"]{width:100%;padding:8px;border:1px solid var(--line)}
+
+/* Give the desk and agenda 40% of the space previously used as desktop margins. */
+@media (min-width: 961px) {
+  .navwrap, main { max-width:none; padding-inline:max(36px, calc(30vw - 318px)); }
+  .roomframe #room-art { max-height:none; }
+}
+.panel-action {
+  border:1px solid #859879; border-radius:4px; background:#edf1dc; color:#304936;
+  min-height:38px; padding:6px 12px; font:650 14px/1.3 var(--body);
+}
+.panel-action.accent { background:#42674e; color:#fffbea; border-color:#36553f; }
+.panel-action:hover { box-shadow:inset 0 0 0 1px currentColor; }
+.review-controls, .review-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+#loot { grid-template-columns:repeat(auto-fit,minmax(94px,1fr)); gap:8px; }
+#loot .loot-cell { padding:10px 5px; gap:4px; align-content:center; font-size:13px; line-height:1.35; }
+#loot .loot-cell small { position:static; font:600 11px var(--body); }
+#loot [data-owned="false"] { border-style:dashed; background:transparent; }
+#loot [data-owned="false"] img { filter:grayscale(.7); opacity:.7; }
+@media(max-width:660px) { .panel-action { min-height:44px; } }
+.log-total, .time-events li, .log-week button { display:flex; align-items:center; gap:10px; }
+.log-total { justify-content:space-between; padding:10px 0; }
+.week-total { border-top:1px solid var(--line); margin-top:18px; }
+.time-events { list-style:none; padding:0; margin:0 0 10px; }
+.time-events li { padding:6px 0; border-top:1px solid var(--soft); }
+.time-events time { margin-left:auto; }
+.log-total time, .time-events time, .log-week time { font-variant-numeric:tabular-nums; }
+.log-week { display:grid; gap:4px; }
+.log-week button { justify-content:space-between; padding:7px 10px; background:var(--paper); border:1px solid var(--soft); }
+.log-week button[aria-pressed="true"] { background:#e4ead8; border-color:#769575; }
+.form-error { color:#8f3e28; }

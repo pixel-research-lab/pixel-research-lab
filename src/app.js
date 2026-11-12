@@ -33,7 +33,12 @@ function render(){
  $('research-quests').innerHTML='<div class="board-inner">'+suggestion+(active.length?'<div class="running-label">내 퀘스트</div>'+active.map(q=>qRow(q,false)).join(''):'')+'</div>';
  $('skills').innerHTML=tracks.map(t=>{const totals=t.skills.map((_,i)=>stats(t.id,i));const n=totals.filter(s=>s.rank>=2).length, xp=totals.reduce((sum,s)=>sum+s.xp,0);return '<button class="skill-row" data-do="skill" data-arg="'+t.id+'">'+sprite(t.id,'skill-icon')+'<b>'+t.name+'</b><span class="hint">'+t.hint+'</span>'+(xp?'<span class="skill-xp">경험 '+xp+'</span>':'')+'<span class="skill-num">'+n+' / '+t.skills.length+' ›</span></button>'}).join('');
  const ids=Object.keys(lootDefs),owned=ids.filter(i=>state.inventory[i]);$('loot-count').textContent=owned.length+' / '+ids.length+'종';
- $('loot').innerHTML=ids.map(i=>state.inventory[i]?'<button class="loot-cell" data-do="item" data-arg="'+i+'" aria-label="'+lootDefs[i][0]+'">'+sprite(i)+'<small>×'+state.inventory[i]+'</small></button>':'<span class="loot-cell unknown" aria-label="미발견 아이템">?</span>').join('')+'<p class="drawer-note">'+(owned.length===1?'새싹 화분은 입실 선물이에요.':'수집한 아이템을 선택해 책상에 놓으세요.')+'</p>';
+ $('loot').innerHTML=ids.map(id=>{
+   const count=state.inventory[id]||0;
+   return '<button class="loot-cell" data-do="item" data-arg="'+id+'" data-owned="'+!!count+'">'+sprite(id)+
+     '<span>'+escapeHTML(lootDefs[id][0])+'</span><small>'+(count?'보유 ×'+count:'미획득')+'</small></button>';
+ }).join('');
+
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
@@ -54,11 +59,11 @@ function updateClock(){
  const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
  const day=reviewSchedule.today(date);
  if(reviewDay!==day){paintReviews(day);reviewDay=day;}
- if(home && paintedMinute!==minute){paintRoom(state.slots,date,studio.wallet(state).fitted);paintedMinute=minute;petUI.refresh(date,studyDay,dailyReviews(day).remaining.length);}
+ if(home && paintedMinute!==minute){paintRoom(state.slots,date,studio.wallet(state).fitted);paintedMinute=minute;petUI.refresh();}
  if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
  const second=Math.floor(now/1000);
  if(recordedSecond===second)return;
- recordedSecond=second;petUI.tick();
+ recordedSecond=second;
  $('study-total').textContent=attendance.duration(attendance.dayTotal(studyDay,date,now));
  const last=studyDay.accepted.at(-1);
  const status=studyDay.status, [action,label]=shiftActions[status];
@@ -98,7 +103,7 @@ async function recordShift(action){
    if(!attendance.next[studyDay.status][action])return;
  }
  const last=studyDay.accepted.at(-1), id=crypto.randomUUID();
- const event={id,action,at:Math.max(Date.now(),(last?.at||0)+1)};
+ const event={id,action,at:Math.max(Date.now(),(last?.at||0)+1,(last?.recordedAt||0)+1)};
  state.attendance=[...(state.attendance||[]),event];
  writingShift=true;resetClockView();
  try{
@@ -217,8 +222,9 @@ function paintReviews(day){
  const active=state.quests.filter(q=>q.status!=='done').length;
  planner.paint(day,active+remaining.length);
  const limit=state.reviewLimit??reviewSchedule.defaultLimit;
+ $('review-limit-button').textContent='복습 설정 · 하루 '+limit+'문제';
  $('review-board').innerHTML='<div class="review-footer"><span>복습 XP '+rows.reduce((sum,r)=>sum+r.xp,0)+'</span>'+
-   (rows.length?b('복습 자료 관리','review-files','textbtn'):'')+b('하루 '+limit+'문제 · 설정','review-settings','textbtn')+
+   (rows.length?b('복습 자료 관리','review-files','textbtn'):'')+
    (upcoming.length?b('복습 예정 '+upcoming.length+'개','upcoming','textbtn'):'')+'</div>';
  $('review-count').textContent=archived.length+'건';
  $('review-records').innerHTML=archived.length?archived.map(r=>reviewRow(r,true)).join(''):
@@ -446,7 +452,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'grade-no':gradeReview(false);break;
  case 'review-record':reviewRecord(arg);break;
  case 'shift':recordShift(arg);break;
- case 'focus-clock':$('shift-main').focus();break;
+ case 'focus-clock':shiftManager.open();break;
  case 'account':accountPanel();break;
  case 'sign-in':pixelAccount.login(!!$('link-guest')?.checked).catch(e=>{const field=$('auth-feedback');if(field)field.textContent=e.code==='auth/popup-closed-by-user'?'로그인 창이 닫혔어요.':'로그인을 마치지 못했어요. 인터넷 연결과 팝업 허용을 확인해 주세요.';});break;
  case 'sign-out':pixelAccount.logout().catch(()=>toast('로그아웃을 완료하지 못했어요.'));break;
@@ -462,8 +468,8 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  case 'new':newForm();break; case 'reroll':takeOffer();save();render();break;
  case 'accept':{const r=requests[state.offer];const ongoing=state.quests.find(q=>q.status!=='done'&&q.title===r[0]);const q=ongoing||make(r[1],r[2],r[3],r[0]);if(!ongoing)state.quests.push(q);takeOffer();save();render();quest(q.id);break;}
  case 'quest':quest(arg);break;case 'record':record(arg);break;case 'skill':skillSheet(arg);break;
- case 'desk':removeMode=false;desk();break;case 'place-loot':case 'pick':removeMode=false;desk(arg);break;
- case 'item':show('전리품 서랍',lootDefs[arg][0],itemBox(arg)+b('책상에 놓기','place-loot','primary',arg));break;
+ case 'desk':removeMode=false;desk();break;case 'place-loot':case 'pick':if(!state.inventory[arg])break;removeMode=false;desk(arg);break;
+ case 'item':show('전리품 서랍',lootDefs[arg][0],itemBox(arg)+(state.inventory[arg]?b('책상에 놓기','place-loot','primary',arg):'<p class="muteline">미획득 · 연구 퀘스트를 완료하면 전리품을 얻을 수 있어요.</p>'));break;
  case 'slot':placeAt(Number(arg));break;case 'remove-mode':selectedLoot=null;desk();removeMode=true;$('modal-body').querySelector('p').textContent='서랍에 돌려놓을 장식을 책상에서 선택하세요.';break;
  case 'journal':changeTab(false);break;case 'close':modal.close();break;
  }});
@@ -513,6 +519,7 @@ async function commit(change){
 }
 const fileOwner=()=>pixelAccount.uid||'guest:'+key;
 const materials=createMaterialUI({getState:()=>state,owner:fileOwner,commit,esc:escapeHTML,toast});
+const shiftManager=createAttendanceUI({getState:()=>state,show,commit});
 const petUI=createPetUI({getState:()=>state,show,commit,toast});
 const studioUI=createStudioUI({getState:()=>state,show,toast,escapeHTML,commit});
 const planner=createPlanner({getState:()=>state,show,toast,escapeHTML,commit});
