@@ -41,8 +41,13 @@ const richEditor = (() => {
     function figure(f){
       const block=document.createElement('figure'),id=crypto.randomUUID(),url=URL.createObjectURL(f);
       staged.set(id,{id,f,url});block.className='rich-piece rich-figure';block.dataset.ref=id;
-      block.innerHTML='<img alt="본문에 넣은 그림"><input type="text" class="rich-caption" maxlength="200" aria-label="그림 캡션" placeholder="캡션 추가 (선택) · 예: 그림 1. 실험 결과">'+controls();
-      block.querySelector('img').src=url;return block;
+      block.innerHTML='<div class="image-resize-area"></div><input type="text" class="rich-caption" maxlength="200" aria-label="그림 캡션" placeholder="캡션 추가 (선택) · 예: 그림 1. 실험 결과">'+controls();
+      const img=document.createElement('img');
+      img.alt='본문에 넣은 그림';img.src=url;
+      imageResize.mount(block.querySelector('.image-resize-area'), img, undefined, percent=>{
+        staged.get(id).widthPercent=percent;
+      });
+      return block;
     }
     function code(){
       const block=document.createElement('div');block.className='rich-piece rich-snippet';
@@ -127,9 +132,9 @@ const richEditor = (() => {
         if(el.classList.contains('rich-paragraph')){
           const text=el.innerText;if(text.trim())blocks.push({type:'text',text});
         }else if(el.dataset.ref){
-          const {id,f}=staged.get(el.dataset.ref);
-          blocks.push({type:'image',ref:id,caption:el.querySelector('input').value.trim()});
-          files.push({id,f,section,inline:true});
+          const {id,f,widthPercent}=staged.get(el.dataset.ref);
+          blocks.push({type:'image',ref:id,caption:el.querySelector('.rich-caption').value.trim()});
+          files.push({id,f,section,inline:true,widthPercent});
         }else{
           const text=el.querySelector('textarea').value;
           if(text.trim())blocks.push({type:'code',lang:el.querySelector('select').value,text});

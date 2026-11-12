@@ -42,3 +42,14 @@
 .rich-snippet>small{color:#afc1a9}
 @media(forced-colors:active){.code-stack pre{visibility:hidden}.code-stack textarea{color:CanvasText;caret-color:CanvasText}}
 @media(max-width:660px){#modal:has(.rich-editor),#modal:has(.rich-read){width:calc(100% - 12px);max-height:96dvh}.rich-tools small{width:100%;margin:0}.rich-tools button,.block-controls button{min-height:36px}.rich-blocks{padding:8px}.rich-caption,.code-stack textarea,.code-stack pre{font-size:16px}}
+.image-resize-area{width:100%;min-width:0}
+.image-resize-frame{position:relative;width:fit-content;max-width:100%;margin-inline:auto}
+.image-resize-frame img{height:auto}
+.image-resize-frame button[data-file-open]{display:block;padding:0}
+.image-resize-frame.user-sized img,.image-resize-frame.user-sized button[data-file-open]{width:100%;max-height:none}
+.image-resize-handle{position:absolute;right:-4px;bottom:-4px;width:24px;height:24px;padding:0;border:1px solid #435b4b;border-radius:5px;background:#faf6df;color:#354e3c;cursor:nwse-resize;touch-action:none;user-select:none}
+.image-resize-handle::after{content:"";position:absolute;inset:5px;background:repeating-linear-gradient(135deg,transparent 0 2px,currentColor 2px 4px);clip-path:polygon(100% 0,100% 100%,0 100%)}
+.image-resize-value{display:none;position:absolute;right:0;bottom:24px;background:#24392e;color:white;border-radius:3px;padding:1px 6px;pointer-events:none;font:12px/1.5 ui-monospace,monospace}
+.image-resize-handle:hover+.image-resize-value,.image-resize-handle:focus-visible+.image-resize-value,.is-resizing .image-resize-value{display:block}
+.image-resize-error:empty{display:none}
+.image-resize-frame.small-image{margin-bottom:25px}.small-image .image-resize-handle{top:100%;bottom:auto}

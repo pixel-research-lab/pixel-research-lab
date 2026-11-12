@@ -26,10 +26,13 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
   function clearInline(){for(const url of painted.values())if(url)URL.revokeObjectURL(url);painted.clear();}
   function paintInline(root=document){
     for(const fig of root.querySelectorAll('dialog[open] [data-rich-ref]')){
-      if(painted.has(fig))continue;
       const r=getState().materials?.[fig.dataset.richRef],slot=fig.querySelector('.rich-image');
       if(!r || r.removed || r.parent!==fig.dataset.parent || r.section!==fig.dataset.section || !r.type.startsWith('image/')){
         slot.textContent='그림 자료가 아직 없어요.';continue;
+      }
+      if(painted.has(fig)){
+        imageResize.refresh(slot.querySelector('.image-resize-area'), r.widthPercent);
+        continue;
       }
       const identity=owner();painted.set(fig,null);
       files.read(identity,r).then(blob=>{
@@ -37,7 +40,13 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
         const url=URL.createObjectURL(blob);painted.set(fig,url);
         const btn=document.createElement('button'),img=document.createElement('img');
         btn.type='button';btn.dataset.fileOpen=r.id;btn.title='그림 원본 보기';
-        img.alt=fig.querySelector('figcaption')?.textContent || '본문 그림';img.src=url;btn.append(img);slot.replaceChildren(btn);
+        img.alt=fig.querySelector('figcaption')?.textContent || '본문 그림';img.src=url;btn.append(img);
+        const area=document.createElement('div');area.className='image-resize-area';slot.replaceChildren(area);
+        imageResize.mount(area,btn,getState().materials?.[r.id]?.widthPercent,percent=>commit(s=>{
+          const ref=s.materials?.[r.id];
+          if(owner()!==identity || !ref || ref.removed)throw Error('그림을 다시 열어 주세요.');
+          s.materials={...s.materials,[ref.id]:{...ref,widthPercent:percent}};
+        }));
       }).catch(err=>{
         if(!painted.has(fig)||owner()!==identity||!fig.isConnected)return;
         const retry=document.createElement('button');retry.type='button';retry.className='rich-retry';retry.textContent='그림 다시 불러오기';
@@ -50,12 +59,12 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
     const selected=Array.from(root.querySelectorAll('[data-file-picker]')).flatMap(input=>
       Array.from(input.files,f=>({f,section:input.dataset.filePicker})));
     const refs={};
-    for(const {f,section,id=crypto.randomUUID(),inline} of [...selected,...inlineFiles]){
+    for(const {f,section,id=crypto.randomUUID(),inline,widthPercent} of [...selected,...inlineFiles]){
       const info=await files.inspect(f);
       if(inline && !info.type.startsWith('image/'))throw Error('본문에는 그림 파일만 넣을 수 있어요.');
       if(owner()!==identity)throw Error('계정이 바뀌었어요. 다시 선택해 주세요.');
       await files.put(identity,info.sha,f.slice(0,f.size,info.type));
-      refs[id]={id,parent,section,...(inline?{inline:true}:{}),name:inline?'본문 그림.'+files.formats[info.type].toLowerCase():f.name.slice(0,255)||files.formats[info.type],...info};
+      refs[id]={id,parent,section,...(inline?{inline:true}:{}),...(widthPercent!==undefined?{widthPercent}:{}),name:inline?'본문 그림.'+files.formats[info.type].toLowerCase():f.name.slice(0,255)||files.formats[info.type],...info};
     }
     return refs;
   }

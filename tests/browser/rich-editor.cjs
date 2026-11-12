@@ -12,6 +12,28 @@ async function transfer(p,el,event){
       new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt,clientX:rect.right-2,clientY:rect.top+12}));
   },[png.toString('base64'),event]);
 }
+async function dragWidth(page,figure,targetPercent,touch=false){
+  const area=figure.locator('.image-resize-area'), frame=figure.locator('.image-resize-frame');
+  const handle=figure.getByRole('slider',{name:'그림 너비'});
+  await handle.scrollIntoViewIfNeeded();
+  const box=await handle.boundingBox(), column=await area.boundingBox(), start=await frame.boundingBox();
+  const x=box.x+box.width/2, y=box.y+box.height/2, end=x+(column.width*targetPercent/100-start.width)/2;
+  if(touch){
+    const client=await page.context().newCDPSession(page);
+    try{
+      for(const [type,point] of [['touchStart',x],['touchMove',end],['touchEnd',null]]){
+        await client.send('Input.dispatchTouchEvent',{type,touchPoints:point===null?[]:[{x:point,y}]});
+      }
+    }finally{await client.detach();}
+  }else{
+    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(end,y,{steps:6});await page.mouse.up();
+  }
+  await page.waitForFunction(el=>el.getAttribute('aria-busy')!=='true',await handle.elementHandle());
+  const actual=await figure.locator('img').boundingBox();
+  assert.ok(Math.abs(actual.width-column.width*targetPercent/100)<=2,'expected '+targetPercent+'% of '+column.width+', got '+actual.width);
+  const ratio=await figure.locator('img').evaluate(el=>el.naturalWidth/el.naturalHeight);
+  assert.ok(Math.abs(actual.height-actual.width/ratio)<=1,'preserve original aspect ratio');
+}
 async function main(){
   const browser=await chromium.launch({executablePath:process.env.CHROME_BIN || undefined});
   try{
@@ -30,7 +52,11 @@ async function main(){
     assert.equal(await modal.locator('code').count(),0);
     await p.locator('[data-do="compare-review"]').click();
     assert.equal(await modal.locator('.rich-figure figcaption').count(),2);
-    assert.ok(await modal.locator('.tok-string').count());await close();
+    assert.ok(await modal.locator('.tok-string').count());
+    const sample=modal.locator('.rich-figure').first(), sampleAnswer=modal.locator('.rich-figure').last();
+    await sampleAnswer.locator('img').waitFor();await dragWidth(p,sampleAnswer,72);
+    assert.equal(await sample.locator('.user-sized').count(),0);
+    await close();
     await p.locator('[data-do="new"]').first().click();
     const width=(await modal.boundingBox()).width;assert.ok(width>=900&&width<=1000,width);
     await q.fill('앞뒤');await q.press('Home');await q.press('ArrowRight');
@@ -38,6 +64,7 @@ async function main(){
     assert.deepEqual(await p.locator('.rich-paragraph').allInnerTexts(),['앞','뒤']);
     assert.equal(await p.evaluate(()=>document.activeElement===document.querySelector('.rich-paragraph:last-child')),true);
     await p.keyboard.insertText('그림 아래 ');await p.locator('.rich-caption').fill('그림 1. 관찰 결과');
+    await dragWidth(p,p.locator('.rich-piece.rich-figure'),42);
     await p.locator('.rich-paragraph').last().click();await p.keyboard.press('End');
     await p.locator('[data-r-action="code"]').click();
     const snippet='def inspect(x):\n    return "<샘플>" if x < 2 else None';
@@ -52,8 +79,13 @@ async function main(){
     assert.equal(await read.locator('pre').textContent(),snippet);
     assert.equal(await modal.locator('.file-chip').count(),1);assert.ok(!(await modal.innerText()).includes('hidden-filename'));
     await read.locator('img').waitFor();
+    assert.equal(await read.getByRole('slider').getAttribute('aria-valuenow'),'42');
+    await dragWidth(p,read.locator('figure'),58);
+    await p.locator('#prediction').fill('크기 변경 후에도 예측을 이어 쓴다');
     await close();await p.reload();await p.locator('[data-do=quest]').first().click();
-    await p.locator('.rich-image img').waitFor();await close();
+    await p.locator('.rich-image img').waitFor();
+    assert.equal(await p.locator('#prediction').inputValue(),'크기 변경 후에도 예측을 이어 쓴다');
+    assert.equal(await modal.getByRole('slider').getAttribute('aria-valuenow'),'58');await close();
     await p.locator('[data-do=new-review]').click();
     await p.locator('#review-question').fill('직접 만든 복습');
     await transfer(p,p.locator('#review-question'),'drop');
@@ -77,7 +109,10 @@ async function main(){
     assert.equal(crypto.createHash('sha256').update(Buffer.from(pack.originals[sha],'base64')).digest('hex'),sha);
     const fresh=await open(true);await fresh.locator('[data-do=save-panel]').click();await fresh.locator('#save-file').setInputFiles({name:'save.json',mimeType:'application/json',buffer:saved});await fresh.locator('[data-do=apply-save]').click();
     await fresh.locator('#modal').waitFor({state:'hidden'});await fresh.locator('[data-do=quest]').first().click();
-    await fresh.locator('.rich-image img').waitFor();assert.equal(await fresh.locator('.rich-read pre').textContent(),snippet);
+    await fresh.locator('.rich-image img').waitFor();
+    assert.equal(await fresh.locator('.rich-figure [role=slider]').getAttribute('aria-valuenow'),'58');
+    await dragWidth(fresh,fresh.locator('.rich-figure'),38,true);
+    assert.equal(await fresh.locator('.rich-read pre').textContent(),snippet);
     await fresh.locator('#close-modal').click();await fresh.locator('[data-do=new-review]').click();
     const overflow=()=>fresh.locator('#modal').evaluate(el=>el.scrollWidth>el.clientWidth || el.getBoundingClientRect().width>innerWidth);
     assert.equal(await overflow(),false);await fresh.locator('[data-rich-editor=answer] [data-rich-picker]').setInputFiles({name:'mobile.png',mimeType:'image/png',buffer:png});

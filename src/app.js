@@ -267,7 +267,11 @@ function upcomingReviews(){
 function refreshGuestForReview(){
  if(pixelAccount.uid)return;
  const latest=pixelAccountGuest();
- if(latest && labSave.valid(latest))state=latest;
+ if(latest && labSave.valid(latest)){
+   // An open quest form keeps its quest object while independent file settings change.
+   reconcileQuests(latest);
+   state=latest;
+ }
 }
 function newReview(){
  show('복습 관리','복습 등록','<form id="review-form">'+richEditor.field('prompt')+
@@ -494,7 +498,7 @@ function accountPanel(){
  show('내 연구실','계정 동기화',info);
  if($('account-state'))$('account-state').textContent=account.status;
 }
-function redraw(next){
+function reconcileQuests(next){
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const oldById=new Map(state.quests.map(q=>[q.id,q]));
  let currentChanged=false;
@@ -506,6 +510,9 @@ function redraw(next){
    return q;
  });
  if(currentChanged){modal.close();toast('다른 기기의 퀘스트 기록을 반영했어요.');}
+}
+function redraw(next){
+ reconcileQuests(next);
  state=next;render();
 }
 async function commit(change){
