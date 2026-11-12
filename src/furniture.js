@@ -60,10 +60,11 @@ const furniture = (() => {
     for(const k of Object.keys(pos))if(k!=='calendar'){
       const {x,w}=rect(look,k,pos[k]);spans.push([x,x+w]);
     }
-    for(const [i,x] of [80,122,221].entries())if(slots[i])spans.push([x,x+16]);
+    for(const [i,x] of [80,122,221].entries())if(slots[i])spans.push([x,x+23]);
     const sites=[];
-    for(let x=r.left+18;x<=r.right-18;x++){
-      if(spans.every(([l,h])=>x+17<=l || x-17>=h))sites.push(x);
+    const radius=20; // The pet button is 11% of the 360-pixel room.
+    for(let x=r.left+radius;x<=r.right-radius;x++){
+      if(spans.every(([l,h])=>x+radius<=l || x-radius>=h))sites.push(x);
     }
     return sites;
   }

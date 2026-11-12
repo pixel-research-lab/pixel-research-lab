@@ -100,7 +100,8 @@ const paintPet = (() => {
   return function paintPet(canvas,id,pose='stand',time=0,face=-1){
     const ctx=canvas.getContext('2d'),color=palette[id];
     const cat=labPets.kinds[id][1]==='cat',kind=cat?'cat':id;
-    const asleep=pose==='sleep',loaf=asleep||pose==='rest',sit=pose==='watch';
+    const asleep=pose==='sleep', grooming=pose==='groom', stretching=pose==='stretch';
+    const loaf=asleep||['rest','settle','crouch'].includes(pose),sit=grooming||['watch','lookUp','perk'].includes(pose);
     const air=pose==='up'||pose==='down',walk=pose==='walk'||pose==='approach';
     const stride=walk?Math.floor(time*5)%4:0;
     ctx.save();ctx.clearRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;
@@ -115,14 +116,17 @@ const paintPet = (() => {
     if(loaf){
       const breath=asleep && time%3.8>2.9?-1:0;
       if(asleep)stamp(tails.curled,12,12);else stamp(tails.folded,15,12);
-      stamp(body.loaf,4,11);
-      headX=2;headY=(asleep?8:5)+breath;
+      stamp(body.loaf,4,11+breath);
+      headX=2;headY=(asleep?8:pose==='crouch'?7:5)+breath;
     }else if(sit){
       stamp(tails.folded,16,12);stamp(body.sit,5,10);
-      headX=3;headY=3;
+      headX=3;headY=pose==='lookUp'?0:grooming?4+Math.floor(time*2)%2:pose==='perk'?1:3;
+      if(pose==='lookUp' || pose==='perk'){
+        pixel(7,8,'#',4,4);pixel(8,8,'b',2,4);
+      }
     }else{
       const y=9+low+bob, tailX=id==='corgi'?19:16;
-      const tipLift=Math.floor(time*1.15)%2;
+      const tipLift=Math.floor(time*(pose==='sniff'?4:1.15))%2;
       const tailY=y-(cat?3:kind==='corgi'?1:4)-tipLift;
       stamp(tails[kind],tailX,tailY);
       if(id==='black'){pixel(tailX+7,tailY+1,'b');pixel(tailX+7,tailY+2,'p');}
@@ -140,6 +144,8 @@ const paintPet = (() => {
         pixel(3+swing,15-lift,'s',3);pixel(17-swing,15-lift,'w',3);
       }
       headY=2+low+bob+(air?1:0);
+      if(pose==='sniff'){headX=Math.floor(time*2)%2;headY=7+Math.floor(time*3)%2;}
+      if(stretching){headX=0;headY=6;pixel(0,16,'#',6,2);pixel(1,16,'p',3);}
     }
     // Place coat islands inside the same silhouette in each pose.
     if(id==='calico'){
@@ -153,6 +159,13 @@ const paintPet = (() => {
       pixel(headX+1,headY+2,'w',2,3);pixel(headX+5,headY+3,'m',3,2);
     }else if(id==='cheese'){
       pixel(headX+3,headY+3,'m',1,2);pixel(headX+5,headY+3,'m');
+    }
+    if(grooming){
+      const pawY=headY+7-Math.floor(time*3)%3;
+      pixel(headX+1,pawY,'#',4,3);pixel(headX+2,pawY+1,'p',2,2);
+    }
+    if((pose==='perk' || asleep) && time%4.2>3.6){
+      pixel(headX+6,Math.max(0,headY-1),'#',2);pixel(headX+6,headY,'t');
     }
     const eyes=cat?[2,5]:[2,6],eyeY=headY+5;
     if(asleep || time%5.2>5.02){

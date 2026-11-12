@@ -15,6 +15,7 @@ function curveImage(answer=false){
 // Open a fresh, unsaved quest so a returning visitor can try the same picture.
 async function openSizeExample(){
   const demo=new URLSearchParams(location.search).get('demo');
+  if(demo==='pets'){document.querySelector('.roomframe').scrollIntoView({block:'center'});return;}
   if(demo==='furniture'){document.querySelector('[data-do="studio"]').click();return;}
   if(demo!=='image-size')return;
   const blob=await curveImage();
