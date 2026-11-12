@@ -17,15 +17,27 @@ globalThis.labFiles ??= (() => {
   async function local(owner,sha){
     const d=await db();return new Promise((resolve,reject)=>{
       const req=d.transaction('originals').objectStore('originals').get([owner,sha]);
-      req.onsuccess=()=>resolve(req.result?.blob);req.onerror=()=>reject(req.error);
+      req.onsuccess=()=>{
+        const row=req.result;
+        resolve(row?.blob ?? (row?.bytes ? new Blob([row.bytes],{type:row.type}) : undefined));
+      };req.onerror=()=>reject(req.error);
+    });
+  }
+  function writeOriginal(d,row){
+    return new Promise((resolve,reject)=>{
+      const tx=d.transaction('originals','readwrite');
+      tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('첨부 저장 공간을 확인해 주세요.'));
+      tx.objectStore('originals').put(row);
     });
   }
   async function put(owner,sha,blob){
-    const d=await db();return new Promise((resolve,reject)=>{
-      const tx=d.transaction('originals','readwrite');
-      tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('첨부 저장 공간을 확인해 주세요.'));
-      tx.objectStore('originals').put({owner,sha,blob});
-    });
+    const d=await db();
+    try{await writeOriginal(d,{owner,sha,blob});}
+    catch(error){
+      // Some WebKit sessions accept bytes in IndexedDB but reject Blob objects.
+      if(!['UnknownError','DataCloneError'].includes(error.name))throw error;
+      await writeOriginal(d,{owner,sha,type:blob.type,bytes:await blob.arrayBuffer()});
+    }
   }
   async function inspect(blob){
     if(!blob.size || blob.size>maxSize)throw Error('빈 파일 또는 20 MiB를 넘는 파일은 첨부할 수 없어요.');

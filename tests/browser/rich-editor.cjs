@@ -79,13 +79,13 @@ async function main(){
     assert.equal(await read.locator('pre').textContent(),snippet);
     assert.equal(await modal.locator('.file-chip').count(),1);assert.ok(!(await modal.innerText()).includes('hidden-filename'));
     await read.locator('img').waitFor();
-    assert.equal(await read.getByRole('slider').getAttribute('aria-valuenow'),'42');
+    assert.equal(await read.getByRole('slider',{name:'그림 너비',exact:true}).getAttribute('aria-valuenow'),'42');
     await dragWidth(p,read.locator('figure'),58);
     await p.locator('#prediction').fill('크기 변경 후에도 예측을 이어 쓴다');
     await close();await p.reload();await p.locator('[data-do=quest]').first().click();
     await p.locator('.rich-image img').waitFor();
     assert.equal(await p.locator('#prediction').inputValue(),'크기 변경 후에도 예측을 이어 쓴다');
-    assert.equal(await modal.getByRole('slider').getAttribute('aria-valuenow'),'58');await close();
+    assert.equal(await modal.getByRole('slider',{name:'그림 너비',exact:true}).getAttribute('aria-valuenow'),'58');await close();
     await p.locator('[data-do=new-review]').click();
     await p.locator('#review-question').fill('직접 만든 복습');
     await transfer(p,p.locator('#review-question'),'drop');

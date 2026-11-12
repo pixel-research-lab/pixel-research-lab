@@ -146,9 +146,9 @@ const richEditor = (() => {
       }
       return {blocks,files,summary:richBody.summary(blocks)};
     }
-    states.set(root,{snapshot,dispose:()=>{for(const {url} of staged.values())URL.revokeObjectURL(url);staged.clear();}});
+    states.set(root,{snapshot,addFiles,dispose:()=>{for(const {url} of staged.values())URL.revokeObjectURL(url);staged.clear();}});
   }
   function dispose(root){root.querySelectorAll('.rich-editor').forEach(el=>{states.get(el)?.dispose();states.delete(el);});}
   function get(root,section){return states.get(root.querySelector('[data-rich-editor="'+section+'"]')).snapshot();}
-  return {field,mount,dispose,get};
+  return {field,mount,dispose,get,insertFiles:(root,files)=>states.get(root).addFiles(files)};
 })();

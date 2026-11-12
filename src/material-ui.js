@@ -24,6 +24,13 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
   // Keep object URLs only for the life of this dialog, including asynchronous reads.
   const painted=new Map();
   function clearInline(){for(const url of painted.values())if(url)URL.revokeObjectURL(url);painted.clear();}
+  function mountSavedImage(area,content,r,identity){
+    imageResize.mount(area,content,getState().materials?.[r.id]?.widthPercent,percent=>commit(s=>{
+      const ref=s.materials?.[r.id];
+      if(owner()!==identity || !ref || ref.removed)throw Error('그림을 다시 열어 주세요.');
+      s.materials={...s.materials,[ref.id]:{...ref,widthPercent:percent}};
+    }));
+  }
   function paintInline(root=document){
     for(const fig of root.querySelectorAll('dialog[open] [data-rich-ref]')){
       const r=getState().materials?.[fig.dataset.richRef],slot=fig.querySelector('.rich-image');
@@ -42,11 +49,7 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
         btn.type='button';btn.dataset.fileOpen=r.id;btn.title='그림 원본 보기';
         img.alt=fig.querySelector('figcaption')?.textContent || '본문 그림';img.src=url;btn.append(img);
         const area=document.createElement('div');area.className='image-resize-area';slot.replaceChildren(area);
-        imageResize.mount(area,btn,getState().materials?.[r.id]?.widthPercent,percent=>commit(s=>{
-          const ref=s.materials?.[r.id];
-          if(owner()!==identity || !ref || ref.removed)throw Error('그림을 다시 열어 주세요.');
-          s.materials={...s.materials,[ref.id]:{...ref,widthPercent:percent}};
-        }));
+        mountSavedImage(area,btn,r,identity);
       }).catch(err=>{
         if(!painted.has(fig)||owner()!==identity||!fig.isConnected)return;
         const retry=document.createElement('button');retry.type='button';retry.className='rich-retry';retry.textContent='그림 다시 불러오기';
@@ -89,7 +92,11 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
       currentURL=URL.createObjectURL(blob);link.href=currentURL;link.download=r.name;link.hidden=false;
       const el=document.createElement(r.type==='application/pdf'?'iframe':'img');
       if(el.tagName==='IFRAME')el.title=r.name;else el.alt=r.name;
-      el.src=currentURL;display.replaceChildren(el);
+      el.src=currentURL;
+      if(r.inline && r.type.startsWith('image/')){
+        const area=document.createElement('div');area.className='image-resize-area';
+        display.replaceChildren(area);mountSavedImage(area,el,r,identity);
+      }else display.replaceChildren(el);
     }catch(err){if(turn===viewTurn)display.textContent=err.message||'첨부 자료를 열 수 없어요.';}
   }
   document.addEventListener('change',e=>{

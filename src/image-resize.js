@@ -20,17 +20,36 @@ const imageResize = (() => {
     const message = document.createElement('small');
     message.className = 'image-resize-error';
     message.setAttribute('role', 'status');
-    frame.append(content, handle, indicator);
-    area.replaceChildren(frame, message);
+    handle.dataset.corner = 'se';
+    const corners = ['nw','ne','sw'].map(corner => {
+      const grip = document.createElement('span');
+      grip.className = 'image-corner';
+      grip.dataset.corner = corner;
+      grip.setAttribute('aria-hidden', 'true');
+      grip.title = handle.title;
+      return grip;
+    });
+    frame.append(content, ...corners, handle, indicator);
+    const bar = document.createElement('label');
+    bar.className = 'image-size-bar';
+    const range = document.createElement('input');
+    range.type = 'range'; range.min = minimum; range.max = maximum;
+    range.setAttribute('aria-label', '그림 크기');
+    const value = document.createElement('span');
+    value.className = 'image-size-percent';
+    bar.append('그림 크기', range, value);
+    area.replaceChildren(frame, bar, message);
 
-    let drag = null, saving = false;
+    let drag = null, saving = false, sliding = false, rangeStart;
     function measuredPercent() {
       return Math.max(minimum, Math.min(maximum, Math.round(100 * frame.offsetWidth / area.clientWidth) || minimum));
     }
     function label() {
       const percent = measuredPercent();
-      frame.classList.toggle('small-image', frame.offsetHeight < 32 || frame.offsetWidth < 40);
-      indicator.textContent = percent + '%';
+      frame.classList.toggle('small-image', frame.offsetHeight < 48 || frame.offsetWidth < 60);
+      indicator.textContent = value.textContent = percent + '%';
+      range.value = percent;
+      range.setAttribute('aria-valuetext', '본문 너비의 ' + percent + '%');
       handle.setAttribute('aria-valuenow', percent);
       handle.setAttribute('aria-valuetext', '본문 너비의 ' + percent + '%');
     }
@@ -41,7 +60,7 @@ const imageResize = (() => {
       label();
     }
     function refresh(percent) {
-      if (!drag && !saving) display(percent);
+      if (!drag && !saving && !sliding) display(percent);
     }
     controls.set(area, refresh);
     display(savedWidth);
@@ -53,6 +72,7 @@ const imageResize = (() => {
       if (percent === previous) return;
       saving = true;
       handle.setAttribute('aria-busy', 'true');
+      range.disabled = true;
       message.textContent = '';
       try {
         await saveWidth(percent);
@@ -61,20 +81,36 @@ const imageResize = (() => {
         message.textContent = error.message || '크기를 저장하지 못했어요. 다시 조절해 주세요.';
       } finally {
         saving = false;
+        range.disabled = false;
         handle.removeAttribute('aria-busy');
       }
     }
     function currentSetting() {
       return frame.classList.contains('user-sized') ? parseInt(frame.style.width, 10) : undefined;
     }
-    handle.addEventListener('pointerdown', event => {
-      if (drag || saving || !event.isPrimary || event.button !== 0) return;
+    range.addEventListener('input', () => {
+      if (!sliding) { rangeStart = currentSetting(); sliding = true; }
+      display(range.valueAsNumber);
+    });
+    range.addEventListener('change', () => {
+      const percent = range.valueAsNumber;
+      const previous = sliding ? rangeStart : currentSetting();
+      sliding = false;
+      display(percent);
+      persist(percent, previous);
+    });
+    range.addEventListener('pointercancel', () => {
+      if (sliding) { sliding = false; display(rangeStart); }
+    });
+    frame.addEventListener('pointerdown', event => {
+      const grip = event.target.closest('[data-corner]');
+      if (!grip || drag || saving || !event.isPrimary || event.button !== 0) return;
       event.preventDefault();
       handle.focus({preventScroll:true});
       const bounds = frame.getBoundingClientRect();
-      drag = {id:event.pointerId, x:event.clientX, y:event.clientY, width:bounds.width,
+      drag = {grip, corner:grip.dataset.corner, id:event.pointerId, x:event.clientX, y:event.clientY, width:bounds.width,
         aspect:bounds.width / Math.max(1, bounds.height), column:area.clientWidth, previous:currentSetting()};
-      handle.setPointerCapture(event.pointerId);
+      grip.setPointerCapture(event.pointerId);
       frame.classList.add('is-resizing');
       label();
     });
@@ -86,22 +122,24 @@ const imageResize = (() => {
         drag.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
       }
       // The frame is centered: its right edge moves by half the change in width.
-      const delta = drag.axis === 'x' ? 2 * dx : dy * drag.aspect;
+      const horizontal = drag.corner.endsWith('e') ? dx : -dx;
+      const vertical = drag.corner.startsWith('s') ? dy : -dy;
+      const delta = drag.axis === 'x' ? 2 * horizontal : vertical * drag.aspect;
       display(Math.max(minimum, Math.min(maximum, Math.round(100 * (drag.width + delta) / drag.column))));
     }
     function finish(event) {
       if (!drag || event.pointerId !== drag.id) return;
-      const previous = drag.previous;
+      const {previous,grip} = drag;
       const released = event.type === 'pointerup';
       if (released) move(event);
       drag = null;
       frame.classList.remove('is-resizing');
-      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+      if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
       if (released) persist(currentSetting(), previous);
       else display(previous);
     }
-    handle.addEventListener('pointermove', move);
-    for (const type of ['pointerup','pointercancel','lostpointercapture']) handle.addEventListener(type, finish);
+    frame.addEventListener('pointermove', move);
+    for (const type of ['pointerup','pointercancel','lostpointercapture']) frame.addEventListener(type, finish);
     handle.addEventListener('keydown', event => {
       const width = measuredPercent(), step = event.shiftKey ? 1 : 5;
       const keys = {ArrowRight:width+step, ArrowUp:width+step, ArrowLeft:width-step, ArrowDown:width-step,
