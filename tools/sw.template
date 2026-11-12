@@ -32,6 +32,11 @@ self.addEventListener('fetch', event => {
   event.respondWith((async () => {
     const cache = await caches.open(cacheName);
     const saved = await cache.match(isEntry ? entry : path);
+    // A cached entry can follow a host redirect from /index.html to /.
+    // Navigation requests reject a redirected Response when redirect mode is manual.
+    if (isEntry && saved?.redirected) {
+      return new Response(saved.body, {headers:saved.headers, status:saved.status, statusText:saved.statusText});
+    }
     return saved || fetch(event.request);
   })());
 });
