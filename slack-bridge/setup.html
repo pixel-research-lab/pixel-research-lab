@@ -13,7 +13,7 @@
 <label id="personal-box" hidden>본인 사용자 토큰 <input id="personal" type="password" placeholder="xoxp-…" autocomplete="off"><small>개인 DM을 선택한 설정으로 설치한 뒤 User OAuth Token을 입력하세요.</small></label>
 <p>Slack 토큰은 이 컴퓨터의 수신기 메모리에만 보관합니다. 수신기를 다시 실행하면 다시 입력하세요.</p>
 <button type="submit">Slack 연결 확인</button><p id="result" role="status"></p></form></section>
-<section><h2>3. 픽셀 연구실에서 받기</h2><p>연구실에서 <b>컴퓨터 → 수신기 연결</b>을 열고 아래 코드를 입력하세요. 연결 창을 열어 두면 Slack 공지가 도착합니다.</p><code id="code"></code></section>
+<section><h2>3. 픽셀 연구실에서 받기</h2><p>연구실 홈에서 <b>Slack 알림 받기 → 수신기 연결</b>을 누르고 아래 코드를 입력하세요. 연결이 끝나면 설정 탭을 닫아도 됩니다.</p><code id="code"></code></section>
 <script>
 const $=id=>document.getElementById(id),admin=location.hash.slice(1)||sessionStorage.getItem('admin');
 if(admin)sessionStorage.setItem('admin',admin);history.replaceState(null,'',location.pathname);
@@ -39,7 +39,7 @@ $('settings').onsubmit=async e=>{
   const resp=await fetch('/setup',{method:'POST',headers,body:JSON.stringify(input)});const result=await resp.json();
   if(!resp.ok)throw Error(result.error||'설정을 확인해 주세요.');
   for(const id of ['app','bot','personal'])$(id).value='';
-  $('result').textContent='설정을 확인했어요. 연구실의 수신기 연결 창에 아래 코드를 입력하세요.';
+  $('result').textContent='설정을 확인했어요. 연구실 홈의 수신기 연결에 아래 코드를 입력하세요.';
  }catch(e){$('result').textContent=e.message;}finally{button.disabled=false;}
 };
 </script></html>

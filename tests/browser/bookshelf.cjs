@@ -49,19 +49,34 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42
   const alert=home.locator('#home-slack-card'),switcher=home.locator('#home-slack-toggle'),line=home.locator('#home-slack-text');
   await home.waitForFunction(()=>!document.querySelector('main').inert && !!localStorage.getItem('pixel-workspace-preview.v1'));
   assert.equal(await alert.isVisible(),false);await switcher.check();
-  await home.context().route('http://127.0.0.1:19387/pair**',r=>r.fulfill({contentType:'text/html',body:'<title>Test receiver</title>'}));
-  const opened=home.waitForEvent('popup');await home.locator('#home-slack-connect').click();const relay=await opened;
-  await relay.waitForLoadState();const now=Date.now(),events=[
+  const ctx=home.context(),code='a'.repeat(24),endpoint='http://127.0.0.1:19389/events';
+  let pagesOpened=0,mode=200;const events=[];ctx.on('page',()=>pagesOpened++);
+  await ctx.route(endpoint,async route=>{
+    const valid=route.request().headers().authorization==='Bearer '+code;
+    await route.fulfill({status:valid?mode:401,contentType:'application/json',headers:{'Access-Control-Allow-Origin':new URL(base).origin},
+      body:JSON.stringify(valid && mode===200?{connected:true,rows:events}:{})});
+  });
+  await home.locator('#home-slack-connect').click();await home.locator('#relay-pair input').fill(code);
+  await home.getByRole('button',{name:'이 브라우저에 연결'}).click();await home.locator('#modal').waitFor({state:'hidden'});
+  assert.equal(pagesOpened,0);await line.filter({hasText:'새 알림이 없어요.'}).waitFor();
+  const now=Date.now();events.push(
     {id:'TTEST_EvA',label:'#연구',kind:'channel',at:now-100,url:'https://app.slack.com/client/TTEST/CBOARD'},
-    {id:'TTEST_EvB',label:'동료',kind:'dm',at:now,url:'https://app.slack.com/client/TTEST/DCHAT'}];
-  const deliver=()=>relay.evaluate(rows=>{const q=new URLSearchParams(location.hash.slice(1));opener.postMessage({type:'pixel-notices',nonce:q.get('nonce'),connected:true,rows},q.get('origin'));},events);
-  await deliver();await line.filter({hasText:'동료님에게 Slack DM이 왔어요. · 미확인 2건'}).waitFor();
+    {id:'TTEST_EvB',label:'동료',kind:'dm',at:now,url:'https://app.slack.com/client/TTEST/DCHAT'});
+  await line.filter({hasText:'동료님에게 Slack DM이 왔어요. · 미확인 2건'}).waitFor();
   assert.equal(await home.locator('#home-slack-open').getAttribute('href'),events[1].url);
   const tile=await alert.boundingBox(),quest=await home.locator('#home .titlebar [data-do=new]').boundingBox();assert.ok(tile.x+tile.width<=quest.x);
   await home.locator('#home-slack-read').click();await line.filter({hasText:'#연구에 새 글'}).waitFor();
   await switcher.uncheck();await alert.waitFor({state:'hidden'});await home.reload();await switcher.waitFor();assert.equal(await switcher.isChecked(),false);
-  await deliver();await switcher.check();await line.filter({hasText:'#연구에 새 글'}).waitFor();await home.locator('#home-slack-connect').waitFor({state:'hidden'});
+  await switcher.check();await line.filter({hasText:'#연구에 새 글'}).waitFor();await home.locator('#home-slack-connect').waitFor({state:'hidden'});
   await home.locator('#home-slack-read').click();await line.filter({hasText:'새 알림이 없어요.'}).waitFor();
-  assert.deepEqual(issues,[]);console.log('PASS: shelf, rich notes/re-edit, next-day sourced review, bookmark, link, inbox/read, reload, mobile, correct and missed XP.');
+  const again=await ctx.newPage();await home.close();await again.goto(new URL('?demo=home',base).href);
+  const fresh=again.locator('#home-slack-text');await fresh.filter({hasText:'새 알림이 없어요.'}).waitFor();
+  mode=503;await again.evaluate(()=>window.dispatchEvent(new Event('online')));await fresh.filter({hasText:'다시 연결'}).waitFor();
+  mode=200;events.push({id:'TTEST_EvC',label:'#다시연결',kind:'channel',at:Date.now(),url:'https://app.slack.com/client/TTEST/CBOARD'});
+  await again.evaluate(()=>window.dispatchEvent(new Event('online')));await fresh.filter({hasText:'#다시연결'}).waitFor();
+  await again.locator('#home-slack-read').click();mode=401;
+  await again.evaluate(()=>window.dispatchEvent(new Event('online')));await again.locator('#home-slack-connect').waitFor();
+  assert.equal(await again.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('pixel-slack-device:'))),false);
+  assert.deepEqual(issues,[]);console.log('PASS: shelf, rich notes/re-edit, next-day sourced review, bookmark, link, inbox/read, reload, mobile, correct and missed XP; tab-only Slack, restore, retry and expired pairing.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
