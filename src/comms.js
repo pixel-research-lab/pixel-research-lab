@@ -1,18 +1,20 @@
 function createComms({get,show,commit,toast,owner,esc}){
   const $=id=>document.getElementById(id);
   const button=(label,act,id='',style='secondary')=>'<button type="button" class="'+style+'" data-comms="'+act+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
-  const unread=()=>Object.values(get().roomNotices||{}).filter(n=>!n.read).length;
+  const records=()=>({...get().roomNotices,...cloud?.rows});
+  const unread=()=>Object.values(records()).filter(n=>!n.read).length;
   const toggle=$('home-slack-toggle');
-  const receiver=createSlackReceiver({owner,onChange:()=>{paintHome();paintStatus();},onRows:async(rows,who,stillCurrent)=>{
+  const cloud=createServerSlack({onChange:paint,onNotice:toast});
+  const receiver=cloud || createSlackReceiver({owner,onChange:()=>{paintHome();paintStatus();},onRows:async(rows,who,stillCurrent)=>{
     const incoming=rows.slice(-80).filter(r=>r && !r.sample);
     const latest=incoming.filter(r=>libraryData.notice(r) && !Object.hasOwn(get().roomNotices||{},r.id)).sort((a,b)=>b.at-a.at)[0];
     await receipts(incoming,who,stillCurrent);
     if(stillCurrent() && get().homeSlack && latest && Date.now()-latest.at<60000)toast(latest.label+(latest.kind==='dm'?'님에게 Slack DM이 왔어요.':'에 새 글이 올라왔어요.'));
   }});
   function paintHome(){
-    const on=get().homeSlack===true,card=$('home-slack-card'),line=$('home-slack-text');
+    const on=get().homeSlack??!!cloud?.linked,card=$('home-slack-card'),line=$('home-slack-text');
     toggle.checked=on;card.hidden=!on;
-    const fresh=on?Object.entries(get().roomNotices||{}).filter(([,n])=>!n.read).sort((a,b)=>b[1].at-a[1].at):[];
+    const fresh=on?Object.entries(records()).filter(([,n])=>!n.read).sort((a,b)=>b[1].at-a[1].at):[];
     const [id,n]=fresh[0]||[];
     const text=n?(n.sample?'예시 · ':'')+n.label+(n.kind==='dm'?'님에게 Slack DM이 왔어요.':'에 새 글이 올라왔어요.')+(fresh.length>1?' · 미확인 '+fresh.length+'건':''):
       (receiver.status==='Slack 알림 수신 중'?'새 알림이 없어요.':receiver.status||'새 알림을 받으려면 수신기를 연결하세요.');
@@ -22,8 +24,8 @@ function createComms({get,show,commit,toast,owner,esc}){
     openLink.hidden=!n?.url;read.hidden=!n;
     if(n?.url)openLink.href=n.url;else openLink.removeAttribute('href');
     openLink.dataset.id=read.dataset.id=id||'';
-    const connectButton=$('home-slack-connect');connectButton.hidden=receiver.paired&&!receiver.retrying;
-    connectButton.textContent=receiver.retrying?'다시 연결':'수신기 연결';
+    const connectButton=$('home-slack-connect');connectButton.hidden=cloud?cloud.linked:receiver.paired&&!receiver.retrying;
+    connectButton.textContent=cloud?(pixelAccount.uid?'Slack 연결':'로그인하고 Slack 연결'):receiver.retrying?'다시 연결':'수신기 연결';
   }
   toggle.addEventListener('change',async()=>{
     const enabled=toggle.checked;toggle.disabled=true;
@@ -37,7 +39,7 @@ function createComms({get,show,commit,toast,owner,esc}){
     paintHome();if($('comms-inbox'))paintInbox();
   }
   function paintInbox(){
-    const rows=Object.entries(get().roomNotices||{}).sort((a,b)=>b[1].at-a[1].at).slice(0,50);
+    const rows=Object.entries(records()).sort((a,b)=>b[1].at-a[1].at).slice(0,50);
     $('comms-inbox').innerHTML=rows.map(([id,n])=>'<div class="notice-row"><span><small>'+ (n.sample?'예시 · ':'')+(n.read?'확인함':'새 알림')+' · '+
       esc(new Date(n.at).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}))+'</small>'+
       esc(n.label)+(n.kind==='dm'?'님에게 DM이 왔어요.':'에 새 글이 올라왔어요.')+'</span>'+
@@ -48,7 +50,7 @@ function createComms({get,show,commit,toast,owner,esc}){
   function paintStatus(){
     const status=$('relay-state'),action=$('relay-action');
     if(status)status.textContent=receiver.status;
-    if(action){action.dataset.comms=receiver.paired?'disconnect':'connect';action.textContent=receiver.paired?'이 브라우저 연결 끊기':'수신기 연결';}
+    if(action){const linked=cloud?cloud.linked:receiver.paired;action.dataset.comms=linked?'disconnect':'connect';action.textContent=linked?(cloud?'Slack 연결 해제':'이 브라우저 연결 끊기'):(cloud?'Slack 연결':'수신기 연결');}
   }
   function open(){
     const links=Object.entries(get().roomLinks||{}).filter(([,r])=>!r.removed);
@@ -87,6 +89,16 @@ function createComms({get,show,commit,toast,owner,esc}){
   }
   function connect(fromHome=false){
     const who=owner();
+    if(cloud){
+      if(!pixelAccount.uid){$('account-open').click();return;}
+      show('연구실 소통 창','Slack 연결','<p>테스트 워크스페이스의 <b>#새-채널</b> 알림을 이 연구실 계정으로 받아요.</p>'+
+        '<form id="cloud-slack-form"><label><input type="checkbox" name="dm"> 내게 온 개인 DM도 받기</label>'+
+        '<p>채널명 또는 보낸 사람과 Slack 링크를 표시해요. 메시지 본문은 저장하지 않아요.</p>'+
+        '<p role="status" id="cloud-slack-feedback"></p><button type="submit" class="primary">Slack에서 승인하기 ↗</button></form>');
+      const form=$('cloud-slack-form');form.onsubmit=async e=>{e.preventDefault();const submit=form.querySelector('button');submit.disabled=true;
+        try{await cloud.start(form.elements.dm.checked);}catch(error){if(form.isConnected){$('cloud-slack-feedback').textContent=error.message;submit.disabled=false;}}
+      };return;
+    }
     show('Slack 알림','이 브라우저에 수신기 연결','<form id="relay-pair"><label class="field">수신기 연결 코드<input type="password" name="code" autocomplete="off" spellcheck="false" pattern="[a-fA-F0-9]{24}" required maxlength="24"></label>'+
       '<p>수신기 설정에 표시된 24자리 코드를 한 번만 입력하세요. 연결한 뒤에는 픽셀 연구실 탭만 열어 두면 돼요.</p>'+
       '<p id="relay-error" role="status"></p><button type="submit" class="primary">이 브라우저에 연결</button></form>');
@@ -102,6 +114,7 @@ function createComms({get,show,commit,toast,owner,esc}){
     };
   }
   function help(){
+    if(cloud){show('소통 창','Slack 연결 방법','<p>픽셀 연구실에 로그인한 뒤 <b>Slack 연결</b>에서 테스트 워크스페이스를 승인하세요. 다른 기기에서도 같은 연구실 계정으로 로그인하면 홈에서 알림을 받아요.</p>'+button('돌아가기','open'));return;}
     show('소통 창','Slack 연결 방법','<p>컴퓨터에서 픽셀 연구실 Slack 수신기를 실행하고, 수신기 설정에서 테스트 채널을 지정하세요. 채널에 앱을 초대하면 새 공지를 받을 수 있어요.</p>'+
       '<p>홈에서 <b>알림 받기 → 수신기 연결</b>을 누르고 코드를 한 번 입력하세요. 수신기가 실행 중이면 설정 창은 닫아도 돼요. 이 브라우저는 다시 열어도 자동으로 연결돼요.</p>'+
       '<p><a href="https://github.com/pixel-research-lab/pixel-research-lab/blob/feature/bookshelf-and-comms/slack-bridge/README.md" target="_blank" rel="noopener noreferrer">Slack 앱 생성 및 수신기 설정 ↗</a></p>'+
@@ -116,9 +129,10 @@ function createComms({get,show,commit,toast,owner,esc}){
       if(act==='home-connect'){if(receiver.retrying)receiver.retry();else connect(true);}
       if(act==='add' || act==='edit')form(id);
       if(act==='connect'){if(!$('comms-inbox'))open();connect();}
-      if(act==='disconnect'){receiver.disconnect();open();}
+      if(act==='disconnect'){await receiver.disconnect();if(who===owner())open();}
       if(act==='sample' && studio.previewCredit)await receipts([{id:crypto.randomUUID(),kind:'channel',sample:true,label:'#lab-updates',url:'',at:Date.now()}],who);
       if(act==='remove'){await commit(s=>{s.roomLinks={...s.roomLinks,[id]:{removed:true}};});if(who===owner())open();}
+      if(act==='read' && cloud && id.startsWith('cloud_')){await cloud.read(id);return;}
       if(act==='read')await commit(s=>{const n=s.roomNotices?.[id];if(n)s.roomNotices={...s.roomNotices,[id]:{...n,read:true}};});
     }catch(error){toast(error.message);}
   });

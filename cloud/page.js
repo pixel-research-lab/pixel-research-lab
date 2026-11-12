@@ -3,6 +3,7 @@ import {GoogleAuthProvider, reauthenticateWithPopup} from 'firebase/auth';
 import {emptyLab,changes,materialize} from './model.js';
 import {rows,update} from './local.js';
 import {fetchAttachment} from './transport.js';
+const preview=!!document.querySelector('meta[name="pixel-local-preview"]');
 const actor=crypto.randomUUID();
 const clone = v => JSON.parse(JSON.stringify(v));
 const channel = typeof BroadcastChannel==='function' ? new BroadcastChannel('pixel-lab.records.v2') : null;
@@ -10,6 +11,7 @@ let uid=null, epoch=0, revision=0, baseline=null, stop=null, timer, sending=null
 let writes=Promise.resolve(), localWrites=0;
 function message(){
   if(!uid) return '이 브라우저에 저장';
+  if(preview)return '체험실 · 연구 기록은 이 기기에 저장';
   if(!navigator.onLine) return '오프라인 · 기기에 저장';
   if(problem) return problem;
   if(sending) return '동기화 중';
@@ -36,7 +38,7 @@ async function refresh(owner) {
   announce();
 }
 function requestBackground(){
-  if(!navigator.serviceWorker?.controller) return;
+  if(preview || !navigator.serviceWorker?.controller) return;
   navigator.serviceWorker.ready.then(r=>r.sync?.register('pixel-lab-upload')).catch(()=>{});
 }
 function soon(delay=900){
@@ -44,7 +46,7 @@ function soon(delay=900){
 }
 async function upload(){
   const owner=uid;
-  if(!owner||auth.currentUser?.uid!==owner||!navigator.onLine||sending) return;
+  if(preview||!owner||auth.currentUser?.uid!==owner||!navigator.onLine||sending) return;
   const tag={};sending=tag;announce();
   try {
     await writes;
@@ -95,6 +97,7 @@ async function account(user) {
     const owner=uid;
     await refresh(owner);
     if(generation!==epoch)return;
+    if(preview)return;
     stop=listen(owner,delta=>{
       queue(async()=>{
         if(owner!==uid||generation!==epoch)return;
@@ -120,6 +123,7 @@ window.pixelAccount={
     if(channel) channel.onmessage=e=>{if(uid&&e.data===uid)wake();};
     navigator.serviceWorker?.addEventListener('message',e=>{if(e.data==='pixel-lab-sent')wake();});
   },
+  async slackToken(){const user=auth.currentUser;if(!user||user.uid!==uid)throw Error('먼저 로그인하세요.');return user.getIdToken();},
   async calendarAccess(write=false){
     const user=auth.currentUser;
     if(!user || user.uid!==uid)throw Error('login-required');

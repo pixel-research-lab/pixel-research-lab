@@ -1,0 +1,31 @@
+{
+  "display_information": {
+    "name": "Pixel Lab Cloud Preview",
+    "description": "Receive notifications in your Pixel Research Lab account."
+  },
+  "oauth_config": {
+    "redirect_urls": [
+      "https://slack-preview.pixel-research-lab-2e2guk.workers.dev/api/slack/callback"
+    ],
+    "scopes": {
+      "user": [
+        "channels:read",
+        "channels:history",
+        "im:history",
+        "im:read",
+        "users:read"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://slack-preview.pixel-research-lab-2e2guk.workers.dev/api/slack/events",
+      "user_events": [
+        "message.channels",
+        "message.im"
+      ]
+    },
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
