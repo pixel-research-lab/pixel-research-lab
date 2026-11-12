@@ -45,6 +45,23 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42
   const yes=await page('reward');assert.equal(await yes.getByText(/출처 · 실험 노트/).count(),0);
   await yes.locator('[data-do=compare-review]').click();await yes.locator('[data-do=grade-yes]').click();
   assert.match(await yes.locator('.review-reward').innerText(),/\+10 XP · \+6 token/);assert.match(await yes.locator('.review-reward').innerText(),/10\/40/);
+  const home=await page('home',true);
+  const alert=home.locator('#home-slack-card'),switcher=home.locator('#home-slack-toggle'),line=home.locator('#home-slack-text');
+  await home.waitForFunction(()=>!document.querySelector('main').inert && !!localStorage.getItem('pixel-workspace-preview.v1'));
+  assert.equal(await alert.isVisible(),false);await switcher.check();
+  await home.context().route('http://127.0.0.1:19387/pair**',r=>r.fulfill({contentType:'text/html',body:'<title>Test receiver</title>'}));
+  const opened=home.waitForEvent('popup');await home.locator('#home-slack-connect').click();const relay=await opened;
+  await relay.waitForLoadState();const now=Date.now(),events=[
+    {id:'TTEST_EvA',label:'#연구',kind:'channel',at:now-100,url:'https://app.slack.com/client/TTEST/CBOARD'},
+    {id:'TTEST_EvB',label:'동료',kind:'dm',at:now,url:'https://app.slack.com/client/TTEST/DCHAT'}];
+  const deliver=()=>relay.evaluate(rows=>{const q=new URLSearchParams(location.hash.slice(1));opener.postMessage({type:'pixel-notices',nonce:q.get('nonce'),connected:true,rows},q.get('origin'));},events);
+  await deliver();await line.filter({hasText:'동료님에게 Slack DM이 왔어요. · 미확인 2건'}).waitFor();
+  assert.equal(await home.locator('#home-slack-open').getAttribute('href'),events[1].url);
+  const tile=await alert.boundingBox(),quest=await home.locator('.titlebar [data-do=new]').boundingBox();assert.ok(tile.x+tile.width<=quest.x);
+  await home.locator('#home-slack-read').click();await line.filter({hasText:'#연구에 새 글'}).waitFor();
+  await switcher.uncheck();assert.equal(await alert.isVisible(),false);await home.reload();await switcher.waitFor();assert.equal(await switcher.isChecked(),false);
+  await deliver();await switcher.check();await line.filter({hasText:'#연구에 새 글'}).waitFor();assert.equal(await home.locator('#home-slack-connect').isVisible(),false);
+  await home.locator('#home-slack-read').click();await line.filter({hasText:'새 알림이 없어요.'}).waitFor();
   assert.deepEqual(issues,[]);console.log('PASS: shelf, rich notes/re-edit, next-day sourced review, bookmark, link, inbox/read, reload, mobile, correct and missed XP.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

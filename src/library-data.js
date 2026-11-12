@@ -18,7 +18,7 @@ const libraryData = (() => {
   const time=value=>Number.isSafeInteger(value) && value>=0;
   const title=value=>text(value,180) && !!value.trim();
   function valid(s){
-    return entries(s.books,b=>b.removed===true || (title(b.title) && (!b.url || !!link(b.url,true)) &&
+    return (s.homeSlack===undefined || typeof s.homeSlack==='boolean') && entries(s.books,b=>b.removed===true || (title(b.title) && (!b.url || !!link(b.url,true)) &&
       (!b.notesUrl || !!link(b.notesUrl)) && ['논문','자료'].includes(b.type) && time(b.created))) &&
       entries(s.bookNotes,n=>n.removed===true || (uuid.test(n.book) && text(n.question,500) && richBody.valid(n.body) && time(n.at))) &&
       entries(s.reading,r=>text(r.place,180) && ['읽는 중','다 읽음'].includes(r.status) && time(r.at)) &&

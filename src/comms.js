@@ -4,15 +4,48 @@ function createComms({get,show,commit,toast,owner,esc}){
   let popup=null,nonce='',identity=null,active=false,serial=Promise.resolve(),relayStatus='';
   const button=(label,act,id='',style='secondary')=>'<button type="button" class="'+style+'" data-comms="'+act+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
   const unread=()=>Object.values(get().roomNotices||{}).filter(n=>!n.read).length;
+  const sessionKey='pixel-slack-popup:'+location.pathname;
+  const toggle=$('home-slack-toggle');
+  function rememberSession(value){
+    try{if(value)sessionStorage.setItem(sessionKey,JSON.stringify(value));else sessionStorage.removeItem(sessionKey);}catch{}
+  }
+  function resumeSession(event){
+    if(popup||!event.source||!event.data?.nonce)return;
+    let saved;try{saved=JSON.parse(sessionStorage.getItem(sessionKey));}catch{}
+    if(saved?.nonce!==event.data.nonce || saved?.identity!==owner())return;
+    popup=event.source;identity=saved.identity;nonce=saved.nonce;
+  }
   function disconnect(){
+    rememberSession(null);
     nonce='';active=false;identity=null;relayStatus='';
     if(popup && !popup.closed)popup.close();
     popup=null;
   }
+  function paintHome(){
+    const on=get().homeSlack===true,card=$('home-slack-card'),line=$('home-slack-text');
+    toggle.checked=on;card.hidden=!on;
+    const fresh=on?Object.entries(get().roomNotices||{}).filter(([,n])=>!n.read).sort((a,b)=>b[1].at-a[1].at):[];
+    const [id,n]=fresh[0]||[];
+    const text=n?(n.sample?'예시 · ':'')+n.label+(n.kind==='dm'?'님에게 Slack DM이 왔어요.':'에 새 글이 올라왔어요.')+(fresh.length>1?' · 미확인 '+fresh.length+'건':''):
+      active?(relayStatus==='Slack 알림 수신 중'?'새 알림이 없어요.':relayStatus):popup?'수신기 연결을 기다리고 있어요.':'새 알림을 받으려면 수신기를 연결하세요.';
+    if(line.textContent!==(on?text:''))line.textContent=on?text:'';
+    card.toggleAttribute('data-unread',!!n);
+    const openLink=$('home-slack-open'),read=$('home-slack-read');
+    openLink.hidden=!n?.url;read.hidden=!n;
+    if(n?.url)openLink.href=n.url;else openLink.removeAttribute('href');
+    openLink.dataset.id=read.dataset.id=id||'';
+    $('home-slack-connect').hidden=active;
+  }
+  toggle.addEventListener('change',async()=>{
+    const enabled=toggle.checked;toggle.disabled=true;
+    try{await commit(s=>{s.homeSlack=enabled;});}
+    catch(e){toast(e.message);}
+    finally{toggle.disabled=false;paintHome();}
+  });
   function paint(){
     if(popup && (identity!==owner() || popup.closed))disconnect();
     const count=unread();$('notice-light').hidden=!count;$('notice-count').textContent=count?' · '+count:'';
-    if($('comms-inbox'))paintInbox();
+    paintHome();if($('comms-inbox'))paintInbox();
   }
   function paintInbox(){
     const rows=Object.entries(get().roomNotices||{}).sort((a,b)=>b[1].at-a[1].at).slice(0,50);
@@ -65,10 +98,13 @@ function createComms({get,show,commit,toast,owner,esc}){
     const fragment=new URLSearchParams({origin:location.origin,nonce});
     popup=window.open(local+'/pair#'+fragment,'pixelRelay','popup,width=510,height=480');
     if(!popup){toast('수신기 연결 창을 열 수 있게 팝업을 허용해 주세요.');return;}
-    paintInbox();
+    rememberSession({nonce,identity});paint();
   }
+  window.addEventListener('focus',paint);
   window.addEventListener('message',e=>{
-    if(e.origin!==local || !popup || e.source!==popup || !nonce || e.data?.nonce!==nonce || identity!==owner())return;
+    if(e.origin!==local || e.data?.type!=='pixel-notices')return;
+    resumeSession(e);
+    if(!popup || e.source!==popup || !nonce || e.data?.nonce!==nonce || identity!==owner())return;
     const msg=e.data;if(msg.type!=='pixel-notices' || !Array.isArray(msg.rows))return;
     const who=identity,ticket=nonce,first=!active;
     active=true;relayStatus=msg.connected?'Slack 알림 수신 중':'수신기는 연결됨 · Slack 연결 대기';
@@ -76,7 +112,8 @@ function createComms({get,show,commit,toast,owner,esc}){
       const incoming=msg.rows.slice(-80).filter(r=>r && !r.sample);
       const latest=incoming.filter(r=>libraryData.notice(r) && !Object.hasOwn(get().roomNotices||{},r.id)).at(-1);
       await receipts(incoming,who);
-      if(latest && ticket===nonce && Date.now()-latest.at<60000)toast(latest.label+(latest.kind==='dm'?'님에게 Slack DM이 왔어요.':'에 새 글이 올라왔어요.'));
+      if(get().homeSlack && latest && ticket===nonce && Date.now()-latest.at<60000)toast(latest.label+(latest.kind==='dm'?'님에게 Slack DM이 왔어요.':'에 새 글이 올라왔어요.'));
+      if(ticket===nonce)paintHome();
       if(ticket===nonce && $('comms-inbox')){if(first)open();else paintInbox();}
     }).catch(e=>toast(e.message));
   });
@@ -92,6 +129,7 @@ function createComms({get,show,commit,toast,owner,esc}){
     try{
       if(act==='open')open();
       if(act==='help')help();
+      if(act==='home-connect')connect();
       if(act==='add' || act==='edit')form(id);
       if(act==='connect'){if(!$('comms-inbox'))open();connect();}
       if(act==='disconnect'){disconnect();open();}

@@ -12,6 +12,7 @@ export function parts(state) {
   for (const event of state.agendaEvents || []) entries.set('agenda~'+event.key,event);
   for (const [key,done] of Object.entries(state.agendaDone || {})) entries.set('done~'+key,done);
   for (const [key,star] of Object.entries(state.agendaStars || {})) entries.set('star~'+key,star);
+  if (typeof state.homeSlack === 'boolean') entries.set('homeSlack',state.homeSlack);
   if (state.reviewLimit !== undefined) entries.set('reviewLimit', state.reviewLimit);
   if (state.reviewDraw) entries.set('reviewDraw', state.reviewDraw);
   for (const event of state.attendance || []) entries.set('time~'+event.id,event);
@@ -84,6 +85,7 @@ export function materialize(rows) {
     if (id.startsWith('done~')) (state.agendaDone ??= {})[id.slice(5)] = value;
     if (id.startsWith('star~')) (state.agendaStars ??= {})[id.slice(5)] = value;
     if (id === 'pet')state.pet=value;
+    if (id === 'homeSlack') state.homeSlack = value;
     if (id === 'reviewLimit') state.reviewLimit = value;
     if (id === 'reviewDraw') state.reviewDraw = value;
     if (id==='field') state.field=value;

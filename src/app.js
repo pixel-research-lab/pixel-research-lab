@@ -546,7 +546,7 @@ pixelAccount.init({
  claimGuest: guest=>{if(storedValue(key)===JSON.stringify(guest)){localStorage.removeItem(key);localStorage.removeItem(previousKey);}},
  guest:()=>{let g;try{g=JSON.parse(storedValue(key));}catch{}redraw(g&&labSave.valid(g)?g:blank());},
  busy:v=>{document.querySelector('main').inert=v;document.querySelector('header').inert=v;},
- closeAccount:()=>{materials.close();planner.reset();if(modal.open)modal.close();toast('');redraw(blank());},
+ closeAccount:()=>{comms.disconnect();materials.close();planner.reset();if(modal.open)modal.close();toast('');redraw(blank());},
  apply:redraw,alert:toast,
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });

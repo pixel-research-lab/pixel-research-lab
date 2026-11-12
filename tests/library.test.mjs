@@ -8,10 +8,10 @@ const js=name=>readFileSync(new URL('../src/'+name+'.js',import.meta.url),'utf8'
 const library=runInNewContext(js('rich-body')+js('library-data')+'\nlibraryData',{URL,TextEncoder});
 const book=crypto.randomUUID(),memo=crypto.randomUUID();
 test('saved library round-trips with notes, positions and old save support',()=>{
- const state={...emptyLab(),books:{[book]:{title:'논문',type:'논문',created:1,url:'zotero://open-pdf/library/items/ABCD1234?page=4'}},
+ const state={...emptyLab(),homeSlack:true,books:{[book]:{title:'논문',type:'논문',created:1,url:'zotero://open-pdf/library/items/ABCD1234?page=4'}},
    reading:{[book]:{place:'4쪽',status:'읽는 중',at:5}},bookNotes:{[memo]:{book,at:3,question:'왜?',body:[{type:'text',text:'메모'}]}}};
  const read=materialize(Array.from(parts(state),([id,value])=>({id,value})).reverse());
- assert.deepEqual(read.bookNotes,state.bookNotes);assert.deepEqual(read.reading,state.reading);
+ assert.equal(read.homeSlack,true);assert.equal(library.valid({...read,homeSlack:1}),false);assert.deepEqual(read.bookNotes,state.bookNotes);assert.deepEqual(read.reading,state.reading);
  assert.ok(library.valid(read));assert.ok(library.valid(emptyLab()));
  assert.equal(library.link('javascript:alert(1)'), '');assert.equal(library.link('https://x:p@a.com'),'');assert.equal(library.link('zotero://action/run',true),'');
  const row=(id,value,clock)=>({id,value,clock,actor:'actor'});
