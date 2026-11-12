@@ -21,9 +21,13 @@ const labSave = (() => {
     for (const id of s.slots) {
       if (id !== null && (!knownItem(id) || s.slots.filter(slot => slot === id).length > (s.inventory[id] || 0))) return false;
     }
+    for(const card of s.reviews || []){
+      if(('questionBody' in card && !richBody.valid(card.questionBody)) || ('answerBody' in card && !richBody.valid(card.answerBody)))return false;
+    }
     const ids = new Set();
     for (const q of s.quests) {
       if (!object(q) || typeof q.id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(q.id) || ids.has(q.id)) return false;
+      if ('questionBody' in q && !richBody.valid(q.questionBody))return false;
       ids.add(q.id);
       const track = tracks.find(t => t.id === q.track);
       if (!track || !between(q.skill,0,track.skills.length-1) || !['ready','active','done'].includes(q.status) ||

@@ -9,7 +9,7 @@ async function startPlaytest(hooks){
   }));
   hooks.busy(true);
   try{
-    const materials={};
+    const materials={},ids={};
     for(const answer of [false,true]){
       const canvas=document.createElement('canvas');canvas.width=560;canvas.height=270;
       const c=canvas.getContext('2d');
@@ -24,11 +24,18 @@ async function startPlaytest(hooks){
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
       const info=await labFiles.inspect(blob),fid=crypto.randomUUID();
       await labFiles.put('guest:'+key,info.sha,blob);
-      materials[fid]={id:fid,parent:id,section:answer?'answer':'prompt',name:answer?'검증-오차-해설.png':'두-오차-곡선.png',...info};
+      ids[answer?'answer':'prompt']=fid;
+      materials[fid]={id:fid,inline:true,parent:id,section:answer?'answer':'prompt',name:answer?'검증-오차-해설.png':'두-오차-곡선.png',...info};
     }
     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({
       version:1,field:'',showOffer:false,quests:[],attendance,inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0],
-      pet:'black',materials,reviews:[{id,question:'그림에서 과적합을 의심할 만한 구간은 어디일까?',answer:'학습 오차는 계속 줄지만 검증 오차가 다시 커지는 뒤쪽 구간이야.',attempts:[],firstDue:today}]}));
+      pet:'black',materials,reviews:[{id,question:'그림에서 과적합을 의심할 만한 구간은 어디일까?',answer:'학습 오차는 계속 줄지만 검증 오차가 다시 커지는 뒤쪽 구간이야.',questionBody:[
+        {type:'text',text:'두 오차 곡선을 비교해 보세요.'},{type:'image',ref:ids.prompt,caption:'그림 1. 학습 횟수에 따른 오차'},
+        {type:'text',text:'어느 구간에서 과적합을 의심할 수 있을까요?'}],
+        answerBody:[{type:'text',text:'학습 오차가 줄어드는 동안 검증 오차가 다시 커지는 구간이에요.'},
+        {type:'image',ref:ids.answer,caption:'그림 2. 점선은 두 곡선이 벌어지는 구간'},
+        {type:'code',lang:'python',text:'best_epoch = min(range(len(val_loss)), key=val_loss.__getitem__)\nprint("검증 오차가 가장 낮은 지점:", best_epoch)'}],
+        attempts:[],firstDue:today}]}));
   }catch{hooks.alert('예제 자료를 준비하지 못했어요. 직접 파일을 첨부해 볼 수 있어요.');}
   finally{hooks.guest();hooks.busy(false);}
 }

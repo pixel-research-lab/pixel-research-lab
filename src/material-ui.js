@@ -14,24 +14,48 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
   }
   function paint(root=document){
     for(const area of root.querySelectorAll('.file-section')){
-      const list=files.live(getState()).filter(r=>r.parent===area.dataset.parent&&r.section===area.dataset.section);
+      const list=files.live(getState()).filter(r=>r.parent===area.dataset.parent&&r.section===area.dataset.section&&!r.inline);
       area.querySelector('.file-items').innerHTML=list.map(r=>'<button type="button" class="file-chip" data-file-open="'+r.id+
         '"><b>'+files.formats[r.type]+'</b><span>'+esc(r.name)+'</span><small>'+fmt(r.size)+'</small></button>').join('');
       const removals=area.querySelector('.file-removals');
       if(removals)removals.innerHTML=list.map(r=>'<button type="button" class="textbtn" data-file-remove="'+r.id+'">'+esc(r.name)+' 연결 해제</button>').join('');
     }
   }
+  // Keep object URLs only for the life of this dialog, including asynchronous reads.
+  const painted=new Map();
+  function clearInline(){for(const url of painted.values())if(url)URL.revokeObjectURL(url);painted.clear();}
+  function paintInline(root=document){
+    for(const fig of root.querySelectorAll('dialog[open] [data-rich-ref]')){
+      if(painted.has(fig))continue;
+      const r=getState().materials?.[fig.dataset.richRef],slot=fig.querySelector('.rich-image');
+      if(!r || r.removed || r.parent!==fig.dataset.parent || r.section!==fig.dataset.section || !r.type.startsWith('image/')){
+        slot.textContent='그림 자료가 아직 없어요.';continue;
+      }
+      const identity=owner();painted.set(fig,null);
+      files.read(identity,r).then(blob=>{
+        if(!painted.has(fig)||owner()!==identity||!fig.isConnected)return;
+        const url=URL.createObjectURL(blob);painted.set(fig,url);
+        const btn=document.createElement('button'),img=document.createElement('img');
+        btn.type='button';btn.dataset.fileOpen=r.id;btn.title='그림 원본 보기';
+        img.alt=fig.querySelector('figcaption')?.textContent || '본문 그림';img.src=url;btn.append(img);slot.replaceChildren(btn);
+      }).catch(err=>{
+        if(!painted.has(fig)||owner()!==identity||!fig.isConnected)return;
+        const retry=document.createElement('button');retry.type='button';retry.className='rich-retry';retry.textContent='그림 다시 불러오기';
+        retry.onclick=()=>{painted.delete(fig);paintInline();};slot.replaceChildren(err.message+' ',retry);
+      });
+    }
+  }
   // Capture file choices and owning account before the first await.
-  async function collect(root,parent,identity){
+  async function collect(root,parent,identity,inlineFiles=[]){
     const selected=Array.from(root.querySelectorAll('[data-file-picker]')).flatMap(input=>
       Array.from(input.files,f=>({f,section:input.dataset.filePicker})));
     const refs={};
-    for(const {f,section} of selected){
+    for(const {f,section,id=crypto.randomUUID(),inline} of [...selected,...inlineFiles]){
       const info=await files.inspect(f);
+      if(inline && !info.type.startsWith('image/'))throw Error('본문에는 그림 파일만 넣을 수 있어요.');
       if(owner()!==identity)throw Error('계정이 바뀌었어요. 다시 선택해 주세요.');
       await files.put(identity,info.sha,f.slice(0,f.size,info.type));
-      const id=crypto.randomUUID();
-      refs[id]={id,parent,section,name:f.name.slice(0,255)||files.formats[info.type],...info};
+      refs[id]={id,parent,section,...(inline?{inline:true}:{}),name:inline?'본문 그림.'+files.formats[info.type].toLowerCase():f.name.slice(0,255)||files.formats[info.type],...info};
     }
     return refs;
   }
@@ -84,5 +108,5 @@ function createMaterialUI({getState,owner,commit,esc,toast}){
     }catch(err){toast(err.message||'첨부를 저장할 수 없어요.');}
     finally{button.disabled=false;}
   });
-  return {picker,section,collect,attach,paint,close};
+  return {picker,section,collect,attach,paint,paintInline,clearInline,close};
 }
