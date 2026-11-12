@@ -1,0 +1,19 @@
+.room-hotspot{position:absolute;background:transparent;padding:0;border:0;border-radius:3px;box-shadow:none;cursor:pointer;z-index:1}
+.room-hotspot:hover,.room-hotspot:focus-visible{outline:2px dashed #ffe39c;outline-offset:-2px;background:#ffe39c18}
+.shelf-hotspot{left:36.9%;top:11.3%;width:24.7%;height:16.8%}
+#monitor-notes{pointer-events:none;z-index:2}#monitor-notes button{pointer-events:auto}
+#notice-light{position:absolute;top:10%;right:8%;width:8px;height:8px;background:#ffc651;box-shadow:0 0 2px 2px #513c21}
+.roomfoot{flex-wrap:wrap}
+.shelf-actions,.book-links,.reading-form,.notice-row,.link-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.shelf-actions{justify-content:space-between;margin:12px 0}.shelf-actions h3{margin:0}
+.book-links{margin:10px 0}.book-links span{color:var(--sub)}.external{text-decoration:none;display:inline-block}
+.reading-form{align-items:flex-end;border-block:1px solid var(--line);padding:12px 0;margin-block:14px}.reading-form label.field{flex:1 1 115px;margin:0}.reading-form label:first-child{flex-grow:3}
+.resume-book,.book-note,.review-reward,.notice-row,.link-row{background:var(--paper);border:1px solid var(--line);padding:12px;margin:9px 0;border-radius:5px}
+.resume-book small,.book-row small,.review-reward span{display:block;color:var(--sub)}
+.book-row{background:transparent;color:var(--ink);display:flex;align-items:center;gap:12px;text-align:left;width:100%;padding:12px 4px;border:0;border-bottom:1px solid var(--line)}
+.book-row>span:nth-child(2){flex:1}.book-spine{width:12px;height:34px;background:#78957f;border-block:4px solid #b5c1a3;box-shadow:3px 2px #475a4c}
+.review-reward{display:grid;gap:4px}.review-reward progress{width:100%;height:8px;accent-color:var(--leaf)}
+.notice-row>span,.link-row>a{flex:1;min-width:0}.notice-row small{display:block;color:var(--sub)}
+#notice-count:not(:empty){margin-inline-start:4px}
+#modal:has(.shelf-view){width:min(760px,calc(100% - 28px))}
+@media(max-width:550px){.reading-form .field:first-child{flex-basis:100%}.book-links,.shelf-actions{gap:6px}}

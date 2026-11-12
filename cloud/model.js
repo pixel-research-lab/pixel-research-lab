@@ -1,7 +1,7 @@
 // Each quest earns one reward. Completing it on two devices still produces one entry.
 export const emptyLab = () => ({version:1,field:'',showOffer:false,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 const phase = {ready:1, active:2, done:3};
-const studioRecords = {place:'placements',look:'roomLooks',buy:'purchases',fit:'fittings',axis:'skillDefs',claim:'agendaClaims',material:'materials'};
+const studioRecords = {book:'books',memo:'bookNotes',page:'reading',link:'roomLinks',notice:'roomNotices',place:'placements',look:'roomLooks',buy:'purchases',fit:'fittings',axis:'skillDefs',claim:'agendaClaims',material:'materials'};
 export function parts(state) {
   const entries = new Map();
   for (const [prefix,field] of Object.entries(studioRecords))
@@ -39,6 +39,9 @@ export function changes(before, after, seed=false) {
 }
 export function compare(a,b) {
   if (!b) return 1;
+  if (/^(book|memo|link)~/.test(a.id) && !!a.value.removed!==!!b.value.removed)return a.value.removed?1:-1;
+  if (a.id.startsWith('notice~') && a.value.read!==b.value.read)return a.value.read?1:-1;
+  if (a.id.startsWith('page~') && a.value.at!==b.value.at)return a.value.at-b.value.at;
   if (a.id.startsWith('material~') && !!a.value.removed!==!!b.value.removed)return a.value.removed?1:-1;
   if (a.id.startsWith('agenda~g-') && a.value.updated !== b.value.updated)
     return (a.value.updated || 0) - (b.value.updated || 0);

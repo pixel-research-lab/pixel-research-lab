@@ -52,6 +52,7 @@ const furniture = (() => {
       cssBox(document.querySelector(selector),rect(look,id,pos[id]));
     }
     const monitor=rect(look,'monitor',pos.monitor);
+    cssBox(document.querySelector('.monitor-hotspot'),{x:monitor.x,y:monitor.y,w:monitor.w,h:37});
     cssBox(document.getElementById('monitor-notes'),{x:monitor.x+2,y:monitor.y+22,w:monitor.w-4,h:12});
   }
   // Find stretches that fit the entire companion sprite, with space beside equipment.

@@ -1,8 +1,8 @@
 // Keep regular text entry native (including Korean IME). Only intercept image transfers.
 const richEditor = (() => {
-  const fieldNames={quest:'알아내고 싶은 질문',prompt:'질문',answer:'기억하고 싶은 답'};
-  const starts={quest:'question',prompt:'review-question',answer:'review-answer'};
-  const hints={quest:'무엇을 알아내고 싶나요?',prompt:'다음에 다시 풀어 볼 질문을 적어 보세요.',answer:'기억하고 싶은 답과 근거를 적어 보세요.'};
+  const fieldNames={quest:'알아내고 싶은 질문',prompt:'질문',answer:'기억하고 싶은 답',note:'연구 메모'};
+  const starts={quest:'question',prompt:'review-question',answer:'review-answer',note:'book-note'};
+  const hints={quest:'무엇을 알아내고 싶나요?',prompt:'다음에 다시 풀어 볼 질문을 적어 보세요.',answer:'기억하고 싶은 답과 근거를 적어 보세요.',note:'읽은 내용과 떠오른 질문을 적어 보세요.'};
   const states=new WeakMap();
   const images='image/png,image/jpeg,image/webp,image/gif';
   const action=(key,text)=>'<button type="button" data-r-action="'+key+'">'+text+'</button>';
@@ -38,13 +38,21 @@ const richEditor = (() => {
       const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);active=p;cursor=range.cloneRange();
     }
     function controls(){return '<div class="block-controls">'+action('up','위로')+action('down','아래로')+action('remove','삭제')+'</div>';}
-    function figure(f){
-      const block=document.createElement('figure'),id=crypto.randomUUID(),url=URL.createObjectURL(f);
-      staged.set(id,{id,f,url});block.className='rich-piece rich-figure';block.dataset.ref=id;
+    function figure(f,saved){
+      const block=document.createElement('figure'),id=saved?.ref||crypto.randomUUID(),url=f?URL.createObjectURL(f):null;
+      staged.set(id,{id,f,url,widthPercent:saved?.widthPercent});block.className='rich-piece rich-figure';block.dataset.ref=id;
       block.innerHTML='<div class="image-resize-area"></div><input type="text" class="rich-caption" maxlength="200" aria-label="그림 캡션" placeholder="캡션 추가 (선택) · 예: 그림 1. 실험 결과">'+controls();
       const img=document.createElement('img');
-      img.alt='본문에 넣은 그림';img.src=url;
-      imageResize.mount(block.querySelector('.image-resize-area'), img, undefined, percent=>{
+      img.alt=saved?.caption||'본문에 넣은 그림';
+      if(url)img.src=url;
+      if(saved){
+        block.querySelector('.rich-caption').value=saved.caption;
+        saved.read().then(blob=>{
+          if(!staged.has(id)||!root.isConnected)return;
+          const src=URL.createObjectURL(blob);staged.get(id).url=src;img.src=src;
+        }).catch(()=>{img.alt='이 기기에 아직 내려받지 않은 그림';});
+      }
+      imageResize.mount(block.querySelector('.image-resize-area'), img, saved?.widthPercent, percent=>{
         staged.get(id).widthPercent=percent;
       });
       return block;
@@ -113,7 +121,7 @@ const richEditor = (() => {
       if(!piece)return;
       if(act==='remove'){
         const entry=staged.get(piece.dataset.ref);
-        if(entry){URL.revokeObjectURL(entry.url);staged.delete(entry.id);}
+        if(entry){if(entry.url)URL.revokeObjectURL(entry.url);staged.delete(entry.id);}
         const next=piece.nextElementSibling;piece.remove();
         if(next?.classList.contains('rich-paragraph'))focusAt(next);
       }else{
@@ -127,14 +135,15 @@ const richEditor = (() => {
       }
     });
     function snapshot(){
-      const blocks=[],files=[];
+      const blocks=[],files=[],widths={};
       for(const el of host.children){
         if(el.classList.contains('rich-paragraph')){
           const text=el.innerText;if(text.trim())blocks.push({type:'text',text});
         }else if(el.dataset.ref){
           const {id,f,widthPercent}=staged.get(el.dataset.ref);
           blocks.push({type:'image',ref:id,caption:el.querySelector('.rich-caption').value.trim()});
-          files.push({id,f,section,inline:true,widthPercent});
+          if(f)files.push({id,f,section,inline:true,widthPercent});
+          else if(widthPercent!==undefined)widths[id]=widthPercent;
         }else{
           const text=el.querySelector('textarea').value;
           if(text.trim())blocks.push({type:'code',lang:el.querySelector('select').value,text});
@@ -144,11 +153,22 @@ const richEditor = (() => {
         error.textContent=blocks.length?'본문이 너무 길어요. 글이나 코드 일부를 별도 자료로 나눠 주세요.':'한 줄의 내용이나 그림, 코드를 넣어 주세요.';
         root.scrollIntoView({block:'nearest'});first.focus();return null;
       }
-      return {blocks,files,summary:richBody.summary(blocks)};
+      return {blocks,files,widths,summary:richBody.summary(blocks)};
     }
-    states.set(root,{snapshot,addFiles,dispose:()=>{for(const {url} of staged.values())URL.revokeObjectURL(url);staged.clear();}});
+    function restore(blocks,imageData){
+      for(const item of blocks){
+        if(item.type==='text')host.append(paragraph(item.text));
+        else if(item.type==='image')host.append(figure(null,{...item,...imageData(item.ref)}));
+        else{
+          const el=code(),ta=el.querySelector('textarea');ta.value=item.text;
+          el.querySelector('select').value=item.lang;ta.dispatchEvent(new Event('input'));host.append(el);
+        }
+      }
+      if(!host.lastElementChild.classList.contains('rich-paragraph'))host.append(paragraph());
+    }
+    states.set(root,{snapshot,addFiles,restore,dispose:()=>{for(const {url} of staged.values())if(url)URL.revokeObjectURL(url);staged.clear();}});
   }
   function dispose(root){root.querySelectorAll('.rich-editor').forEach(el=>{states.get(el)?.dispose();states.delete(el);});}
   function get(root,section){return states.get(root.querySelector('[data-rich-editor="'+section+'"]')).snapshot();}
-  return {field,mount,dispose,get,insertFiles:(root,files)=>states.get(root).addFiles(files)};
+  return {field,mount,dispose,get,restore:(el,blocks,images)=>states.get(el).restore(blocks,images),insertFiles:(root,files)=>states.get(root).addFiles(files)};
 })();

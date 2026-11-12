@@ -42,7 +42,7 @@ function render(){
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- materials.paint();materials.paintInline();studioUI.paint();reviewDay=null;resetClockView();
+ materials.paint();materials.paintInline();studioUI.paint();comms.paint();reviewDay=null;resetClockView();
 }
 let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
 let writingShift=false;
@@ -273,24 +273,26 @@ function refreshGuestForReview(){
    state=latest;
  }
 }
-function newReview(){
- show('복습 관리','복습 등록','<form id="review-form">'+richEditor.field('prompt')+
+function newReview(source){
+ show('복습 관리','복습 등록','<form id="review-form">'+(source?'<p class="muteline">책장 · '+escapeHTML(source.title)+'</p>':'')+richEditor.field('prompt')+
   materials.picker('prompt')+richEditor.field('answer')+
   materials.picker('answer')+'<label class="field">연결할 스킬<select id="review-focus">'+studioUI.optionList('',true)+'</select></label>'+
   '<p class="muteline">내일부터 오늘의 퀘스트 추첨에 들어가요. 문제를 열면 질문만 먼저 보여요.</p><button class="primary" type="submit">복습 카드 저장</button></form>');
  const form=$('review-form');
+ if(source)$('review-question').textContent=source.question;
  form.onsubmit=async e=>{
   e.preventDefault();if(savingReview)return;
   const prompt=richEditor.get(form,'prompt');if(!prompt)return;
   const answer=richEditor.get(form,'answer');if(!answer)return;
   const card={id:crypto.randomUUID(),question:prompt.summary,answer:answer.summary,questionBody:prompt.blocks,answerBody:answer.blocks,
-    focusSkill:$('review-focus').value||null,firstDue:reviewSchedule.addDays(reviewSchedule.today(),1),attempts:[]};
+    ...(source?{sourceBook:source.id}:{}),focusSkill:$('review-focus').value||null,firstDue:reviewSchedule.addDays(reviewSchedule.today(),1),attempts:[]};
   await saveWithFiles(form,card.id,s=>{s.reviews=[...(s.reviews||[]),card];},()=>{
     modal.close();toast(reviewDate(card.firstDue)+'부터 복습 퀘스트로 뽑힐 수 있어요.');
   },[...prompt.files,...answer.files]);
  };
  $('review-question').focus();
 }
+function sourceLink(card){const book=state.books?.[card.sourceBook];return book&&!book.removed?shelf.source(book):'';}
 function promptBlock(card){return richBody.view(card.questionBody,card.id,'prompt')+materials.section(card.id,'prompt',false);}
 function reviewTitle(card){return card.questionBody?'복습 질문':card.question;}
 function openReview(id){
@@ -303,7 +305,7 @@ function openReview(id){
   '<div class="actions">'+b('답 확인','compare-review','primary')+b('모르겠다','grade-no')+'</div>');
  currentReview={id,due,day};
 }
-function answerBlock(card){return '<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span>'+(richBody.view(card.answerBody,card.id,'answer')||'<p>'+escapeHTML(card.answer)+'</p>')+'</div>'+materials.section(card.id,'answer',false);}
+function answerBlock(card){return sourceLink(card)+'<div class="card-note review-answer"><span class="mini-label">기록해 둔 답</span>'+(richBody.view(card.answerBody,card.id,'answer')||'<p>'+escapeHTML(card.answer)+'</p>')+'</div>'+materials.section(card.id,'answer',false);}
 function currentTurn(){
  const round=currentReview,card=round && reviewById(round.id);
  const day=reviewSchedule.today();
@@ -338,7 +340,7 @@ async function gradeReview(correct){
   const delta=after.xp-before.xp, heading=after.finished?'복습 완료 · 4회 연속 정답':after.streak?'연속 정답 '+after.streak+' / 4':'다시 복습';
   show(heading,reviewTitle(saved),promptBlock(saved)+answerBlock(saved)+'<p class="skill-result">'+
    (after.finished?'연구 일지의 완료한 복습에 남겼어요.':'다음 복습 · '+reviewDate(after.due))+
-   (after.correctTurns>before.correctTurns?' · +'+studio.reviewPay+' token':'')+(delta>0?' · 복습 XP +'+delta:'')+'</p><div class="actions">'+(next?b('다음 질문','review','primary',next.card.id):'')+b('닫기','close')+'</div>');
+   '</p><div class="review-reward"><strong>이번 복습 +'+delta+' XP · +'+(after.correctTurns>before.correctTurns?studio.reviewPay:0)+' token</strong><span>이 카드 '+after.xp+'/40 XP</span><progress value="'+after.xp+'" max="40" aria-label="이 카드의 복습 XP"></progress></div><div class="actions">'+(next?b('다음 질문','review','primary',next.card.id):'')+b('닫기','close')+'</div>');
  }catch{
   if(owner===pixelAccount.uid){
    const latest=reviewById(card.id);
@@ -449,6 +451,8 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
  save();render();desk();toast(lootDefs[id][0]+' 배치 완료');}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
+ case 'books':shelf.list();break;
+ case 'comms':comms.open();break;
  case 'arrange':arrangeFurniture({getState:()=>state,show,commit,toast});break;case 'studio':studioUI.shop();break;case 'axes':studioUI.settings();break;
  case 'review-files':show('복습 관리','복습 자료 관리',reviewRows().map(r=>b(r.card.question,'edit-review-files','secondary',r.card.id)).join(' '));break;
  case 'edit-review-files':{const c=reviewById(arg);if(c)show('복습 자료 관리',reviewTitle(c),richBody.view(c.questionBody,c.id,'prompt')+materials.section(arg,'prompt')+'<h3>기억하고 싶은 답</h3>'+(richBody.view(c.answerBody,c.id,'answer')||'<p>'+escapeHTML(c.answer)+'</p>')+materials.section(arg,'answer')+b('목록','review-files'));break;}
@@ -531,6 +535,8 @@ async function commit(change){
 }
 const fileOwner=()=>pixelAccount.uid||'guest:'+key;
 const materials=createMaterialUI({getState:()=>state,owner:fileOwner,commit,esc:escapeHTML,toast});
+const shelf=createBookshelf({get:()=>state,show,commit,toast,owner:fileOwner,saveWithFiles,newReview,esc:escapeHTML});
+const comms=createComms({get:()=>state,show,commit,toast,owner:fileOwner,esc:escapeHTML});
 const shiftManager=createAttendanceUI({getState:()=>state,show,commit});
 const petUI=createPetUI({getState:()=>state,show,commit,toast});
 const studioUI=createStudioUI({getState:()=>state,show,toast,escapeHTML,commit});

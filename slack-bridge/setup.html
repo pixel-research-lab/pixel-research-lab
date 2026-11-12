@@ -1,0 +1,45 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>픽셀 연구실 · Slack 수신기 설정</title>
+<style>[hidden]{display:none!important}*{box-sizing:border-box}body{font:16px/1.65 system-ui;background:#f4f0df;color:#294538;max-width:660px;margin:auto;padding:28px 18px}h1{font-size:26px}section{background:#fffcf1;border:1px solid #b3b8a1;padding:18px;margin:14px 0;border-radius:6px}label{display:block;margin:10px 0}input:not([type=checkbox]){font:inherit;width:100%;padding:7px}a{color:#355f48}button{background:#385f49;color:white;border:0;padding:10px 16px;font:inherit;border-radius:4px;cursor:pointer}code{overflow-wrap:anywhere}small{display:block}</style>
+<h1>Slack 수신기 설정</h1>
+<section><h2>1. 테스트 앱 설치</h2>
+<label>워크스페이스 ID <input id="team" placeholder="T…" autocomplete="off"></label>
+<label>알림을 받을 공개 채널 ID <input id="channel" placeholder="C…" autocomplete="off"></label>
+<label><input type="checkbox" id="dm"> 내 개인 DM 알림도 받기</label>
+<a id="create" target="_blank" rel="noopener noreferrer">Slack에서 이 설정으로 앱 만들기 ↗</a>
+<p>테스트 워크스페이스를 선택하고 생성한 앱의 <b>Install App</b>에서 설치하세요. 채널에서 <code>/invite @Pixel Research Lab</code>으로 앱을 추가하세요.</p></section>
+<section><h2>2. 이 컴퓨터에 연결</h2><form id="settings">
+<label>앱 수준 토큰 <input id="app" type="password" required placeholder="xapp-…" autocomplete="off"><small>Basic Information → App-Level Tokens → connections:write</small></label>
+<label>봇 토큰 <input id="bot" type="password" required placeholder="xoxb-…" autocomplete="off"><small>OAuth &amp; Permissions → Bot User OAuth Token</small></label>
+<label id="personal-box" hidden>본인 사용자 토큰 <input id="personal" type="password" placeholder="xoxp-…" autocomplete="off"><small>개인 DM을 선택한 설정으로 설치한 뒤 User OAuth Token을 입력하세요.</small></label>
+<p>Slack 토큰은 이 컴퓨터의 수신기 메모리에만 보관합니다. 수신기를 다시 실행하면 다시 입력하세요.</p>
+<button type="submit">Slack 연결 확인</button><p id="result" role="status"></p></form></section>
+<section><h2>3. 픽셀 연구실에서 받기</h2><p>연구실에서 <b>컴퓨터 → 수신기 연결</b>을 열고 아래 코드를 입력하세요. 연결 창을 열어 두면 Slack 공지가 도착합니다.</p><code id="code"></code></section>
+<script>
+const $=id=>document.getElementById(id),admin=location.hash.slice(1)||sessionStorage.getItem('admin');
+if(admin)sessionStorage.setItem('admin',admin);history.replaceState(null,'',location.pathname);
+const headers={Authorization:'Bearer '+admin,'Content-Type':'application/json'};
+async function manifest(){
+ const m=await fetch($('dm').checked?'/manifest-dm':'/manifest').then(r=>r.json());
+ const params=new URLSearchParams({new_app:'1',manifest_json:JSON.stringify(m)});
+ if(/^T[A-Z0-9]+$/.test($('team').value.trim()))params.set('team',$('team').value.trim());
+ $('create').href='https://api.slack.com/apps?'+params;
+ $('personal-box').hidden=!$('dm').checked;$('personal').required=$('dm').checked;
+}
+async function init(){
+ const r=await fetch('/settings',{headers});if(!r.ok)throw Error('수신기를 실행한 터미널에 표시된 설정 주소를 열어 주세요.');
+ const cfg=await r.json();$('team').value=cfg.team;$('channel').value=cfg.channel;$('code').textContent=cfg.code;
+ if(cfg.connected)$('result').textContent='Slack 연결됨';await manifest();
+}
+init().catch(e=>$('result').textContent=e.message);
+$('team').oninput=$('dm').onchange=manifest;
+$('settings').onsubmit=async e=>{
+ e.preventDefault();const button=e.target.querySelector('button');button.disabled=true;$('result').textContent='워크스페이스와 채널 확인 중…';
+ try{
+  const input=Object.fromEntries(['team','channel','app','bot','personal'].map(k=>[k,$(k).value.trim()]));if(!$('dm').checked)input.personal='';
+  const resp=await fetch('/setup',{method:'POST',headers,body:JSON.stringify(input)});const result=await resp.json();
+  if(!resp.ok)throw Error(result.error||'설정을 확인해 주세요.');
+  for(const id of ['app','bot','personal'])$(id).value='';
+  $('result').textContent='설정을 확인했어요. 연구실의 수신기 연결 창에 아래 코드를 입력하세요.';
+ }catch(e){$('result').textContent=e.message;}finally{button.disabled=false;}
+};
+</script></html>

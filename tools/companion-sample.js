@@ -15,6 +15,21 @@ function curveImage(answer=false){
 // Open a fresh, unsaved quest so a returning visitor can try the same picture.
 async function openSizeExample(){
   const demo=new URLSearchParams(location.search).get('demo');
+  if(demo==='books'){document.querySelector('[data-do="books"]').click();return;}
+  if(demo==='comms'){
+    document.querySelector('[data-do="comms"]').click();
+    const channel=new URLSearchParams(location.hash.slice(1)).get('slack')||'';
+    if(/^T[A-Z0-9]+\/C[A-Z0-9]+$/.test(channel)){
+      const url='https://app.slack.com/client/'+channel;
+      if(![...document.querySelectorAll('.link-row a')].some(a=>a.href===url)){
+        document.querySelector('[data-comms="add"]').click();
+        const form=document.getElementById('room-link');
+        form.elements.name.value='테스트 Slack 채널';form.elements.url.value=url;
+      }
+    }
+    return;
+  }
+  if(demo==='reward'){document.querySelector('[data-do="review"]')?.click();return;}
   if(demo==='pets'){document.querySelector('.roomframe').scrollIntoView({block:'center'});return;}
   if(demo==='furniture'){document.querySelector('[data-do="studio"]').click();return;}
   if(demo!=='image-size')return;
@@ -35,7 +50,7 @@ async function startPlaytest(hooks){
   }));
   hooks.busy(true);
   try{
-    const materials={},ids={};
+    const materials={},ids={},book=crypto.randomUUID(),memo=crypto.randomUUID();
     for(const answer of [false,true]){
       const blob=await curveImage(answer);
       const info=await labFiles.inspect(blob),fid=crypto.randomUUID();
@@ -43,9 +58,16 @@ async function startPlaytest(hooks){
       ids[answer?'answer':'prompt']=fid;
       materials[fid]={id:fid,inline:true,parent:id,section:answer?'answer':'prompt',name:answer?'검증-오차-해설.png':'두-오차-곡선.png',...info};
     }
+    const figure=crypto.randomUUID();
+    materials[figure]={...materials[ids.prompt],id:figure,parent:memo,section:'note'};
     if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({
       version:1,field:'',showOffer:false,quests:[],attendance,inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0],
-      pet:'black',materials,reviews:[{id,question:'그림에서 과적합을 의심할 만한 구간은 어디일까?',answer:'학습 오차는 계속 줄지만 검증 오차가 다시 커지는 뒤쪽 구간이야.',questionBody:[
+      books:{[book]:{type:'자료',title:'실험 노트 · 학습 곡선',created:Date.now(),url:'',notesUrl:''}},
+      reading:{[book]:{place:'그림 1',status:'읽는 중',at:Date.now()}},
+      bookNotes:{[memo]:{book,at:Date.now(),question:'학습 오차와 검증 오차가 벌어지면 무엇을 의심할까?',body:[
+        {type:'text',text:'이번 실험에서 학습 횟수를 늘리며 두 곡선을 비교했다.'},
+        {type:'image',ref:figure,caption:'그림 1. 실험 중 기록한 오차'}]}},
+      pet:'black',materials,reviews:[{id,sourceBook:book,question:'그림에서 과적합을 의심할 만한 구간은 어디일까?',answer:'학습 오차는 계속 줄지만 검증 오차가 다시 커지는 뒤쪽 구간이야.',questionBody:[
         {type:'text',text:'두 오차 곡선을 비교해 보세요.'},{type:'image',ref:ids.prompt,caption:'그림 1. 학습 횟수에 따른 오차'},
         {type:'text',text:'어느 구간에서 과적합을 의심할 수 있을까요?'}],
         answerBody:[{type:'text',text:'학습 오차가 줄어드는 동안 검증 오차가 다시 커지는 구간이에요.'},
