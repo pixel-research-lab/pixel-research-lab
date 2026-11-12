@@ -121,6 +121,9 @@ const paintPet = (() => {
     }else if(sit){
       stamp(tails.folded,16,12);stamp(body.sit,5,10);
       headX=3;headY=pose==='lookUp'?0:grooming?4+Math.floor(time*2)%2:pose==='perk'?1:3;
+      if(pose==='lookUp' || pose==='perk'){
+        pixel(7,8,'#',4,4);pixel(8,8,'b',2,4);
+      }
     }else{
       const y=9+low+bob, tailX=id==='corgi'?19:16;
       const tipLift=Math.floor(time*(pose==='sniff'?4:1.15))%2;
