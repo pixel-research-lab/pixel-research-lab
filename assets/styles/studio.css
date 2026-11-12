@@ -41,3 +41,17 @@
 .axis-add{align-items:flex-start;border-top:1px dashed #b7b7a1;margin-top:10px;padding-top:10px}
 .axis-add label{min-width:0;flex:1}
 @media(max-width:530px){.studio-checkout{align-items:flex-start;flex-direction:column}.room .paneltop{flex-wrap:wrap}.studio-tabs button{padding:5px 10px}.radar-wrap{gap:4px}.studio-grid button{gap:5px}.axis-list li{font-size:12px}}
+
+#modal:has(.layout-stage),#modal:has(#studio-preview){width:min(820px,calc(100% - 20px))}
+.layout-stage{position:relative;outline:2px solid #819277;margin:12px 1px;background:#b9c3aa}
+.layout-stage canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.layout-pieces{position:absolute;inset:0;pointer-events:none}
+.layout-pieces button{position:absolute;pointer-events:auto;touch-action:none;user-select:none;cursor:grab;border:1px dashed #fff6d7;background:#faf4c011;box-shadow:0 0 0 1px #565e4e}
+.layout-pieces button[aria-pressed=true]{border:2px solid #f7cf78;outline:1px solid #68532d;z-index:1}
+.layout-pieces button:active{cursor:grabbing;transform:none}
+.layout-tools,.layout-arrows,.layout-tools label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.layout-tools{justify-content:space-between;margin:12px 0}
+.layout-tools select{padding:4px 8px}.layout-arrows button{min-width:36px}
+.roomframe .desk-speaker{background:transparent;box-shadow:none}
+.roomframe .desk-speaker::before,.roomframe .desk-speaker::after{display:none}
+.roomframe .desk-speaker span{inset:0}

@@ -1,7 +1,7 @@
 // Each quest earns one reward. Completing it on two devices still produces one entry.
 export const emptyLab = () => ({version:1,field:'',showOffer:false,quests:[],attendance:[],reviews:[],inventory:{plant:1},slots:['plant',null,null],offer:0,seenOffers:[0]});
 const phase = {ready:1, active:2, done:3};
-const studioRecords = {buy:'purchases',fit:'fittings',axis:'skillDefs',claim:'agendaClaims',material:'materials'};
+const studioRecords = {place:'placements',look:'roomLooks',buy:'purchases',fit:'fittings',axis:'skillDefs',claim:'agendaClaims',material:'materials'};
 export function parts(state) {
   const entries = new Map();
   for (const [prefix,field] of Object.entries(studioRecords))

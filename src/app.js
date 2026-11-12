@@ -59,7 +59,7 @@ function updateClock(){
  const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
  const day=reviewSchedule.today(date);
  if(reviewDay!==day){paintReviews(day);reviewDay=day;}
- if(home && paintedMinute!==minute){paintRoom(state.slots,date,studio.wallet(state).fitted);paintedMinute=minute;petUI.refresh();}
+ if(home && paintedMinute!==minute){paintRoom(state.slots,date,{...studio.wallet(state).fitted,placements:state.placements});paintedMinute=minute;petUI.refresh();}
  if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
  const second=Math.floor(now/1000);
  if(recordedSecond===second)return;
@@ -449,7 +449,7 @@ function placeAt(i){if(!Number.isInteger(i)||i<0||i>2)return;
  save();render();desk();toast(lootDefs[id][0]+' 배치 완료');}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(!el)return;const act=el.dataset.do,arg=el.dataset.arg;
  switch(act){
- case 'studio':studioUI.shop();break;case 'axes':studioUI.settings();break;
+ case 'arrange':arrangeFurniture({getState:()=>state,show,commit,toast});break;case 'studio':studioUI.shop();break;case 'axes':studioUI.settings();break;
  case 'review-files':show('복습 관리','복습 자료 관리',reviewRows().map(r=>b(r.card.question,'edit-review-files','secondary',r.card.id)).join(' '));break;
  case 'edit-review-files':{const c=reviewById(arg);if(c)show('복습 자료 관리',reviewTitle(c),richBody.view(c.questionBody,c.id,'prompt')+materials.section(arg,'prompt')+'<h3>기억하고 싶은 답</h3>'+(richBody.view(c.answerBody,c.id,'answer')||'<p>'+escapeHTML(c.answer)+'</p>')+materials.section(arg,'answer')+b('목록','review-files'));break;}
  case 'new-review':newReview();break;
@@ -545,5 +545,5 @@ pixelAccount.init({
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });
 if(!loaded)$('save-state').textContent='현재 창에만 저장';render();
-roomImagesReady.then(()=>paintRoom(state.slots,new Date(),studio.wallet(state).fitted));
+roomImagesReady.then(()=>paintRoom(state.slots,new Date(),{...studio.wallet(state).fitted,placements:state.placements}));
 })();

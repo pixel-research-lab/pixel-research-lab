@@ -44,5 +44,5 @@ page = re.sub(r'(?:src|href)="\./(assets/images/[^"]+)"', lambda m: m[0].split("
 page = page.replace('<body>', '<body><script>const previewImages='+json.dumps(images)+'</script>')
 page = page.replace('id="account-open" class="account-open" data-do="account">로그인', 'id="account-open" class="account-open" disabled>게스트 체험')
 page = re.sub(r'<script src="\./([^"]+)"></script>', script, page)
-page = page.replace("<title>픽셀 연구실 · 나의 연구실</title>","<title>픽셀 연구실 · 그림과 코드 작성 체험실</title>")
+page = page.replace("<title>픽셀 연구실 · 나의 연구실</title>","<title>픽셀 연구실 · 가구 배치 체험실</title>")
 args.output.write_text(page)

@@ -1,6 +1,6 @@
 // Catalog keys are permanent save identifiers. Prices are shared by checkout and replay.
 const studio = (() => {
-  const categories = {room:'이사',wall:'벽지',floor:'바닥',gear:'장비'};
+  const categories = {room:'이사',wall:'벽지',floor:'바닥',gear:'추가 장비',monitor:'모니터',speaker:'스피커',calendar:'벽 달력',clock:'탁상시계'};
   const catalog = {
     room:[
       ['studio','숲속 연구실',0,'창 너머 소나무가 보이는 첫 작업실','#748c75'],
@@ -17,6 +17,22 @@ const studio = (() => {
       ['parquet','헤링본 마루',35,'엇갈려 맞물리는 참나무 조각','#aa785b'],
       ['tile','체커 타일',45,'청록과 아이보리 바둑판','#88a39c'],
       ['terrazzo','라일락 테라조',65,'연보랏빛 돌 속에 박힌 색 조각','#aba1b1']],
+    monitor:[
+      ['house-screen','방 기본 모니터',0,'이사할 때 함께 온 모니터','#798c7f'],
+      ['graphite','그래파이트 디스플레이',85,'얇은 흑연 프레임과 푸른 파형 화면','#526275'],
+      ['amber','앰버 터미널',65,'호박색 글자와 아이보리 모니터 케이스','#bf996c']],
+    speaker:[
+      ['house-audio','기본 스피커',0,'작은 원목 스피커','#927858'],
+      ['walnut-audio','월넛 오디오',30,'호두나무 캐비닛과 황동 우퍼','#926547'],
+      ['mint-audio','민트 라디오',45,'민트색 몸체와 가로 그릴','#7dafa2']],
+    clock:[
+      ['house-clock','기본 탁상시계',0,'네 자리 디지털 시계','#657461'],
+      ['flip-clock','플립 시계',35,'검은 플립 패널과 아이보리 숫자','#75787a'],
+      ['peach-clock','피치 알람시계',45,'복숭아색 테두리와 크림색 액정','#d99986']],
+    calendar:[
+      ['house-calendar','기본 벽 달력',0,'고리가 달린 종이 달력','#b98667'],
+      ['botanic','식물 도감 달력',30,'압화 그림이 있는 초록 표지','#769a71'],
+      ['midnight','밤하늘 달력',45,'별무늬가 그려진 남색 표지','#697392']],
     gear:[
       ['single','기본 모니터',0,'연구실의 첫 모니터','#729482'],
       ['laptop','휴대용 노트북',70,'책상 왼쪽에 놓인 작은 노트북','#ac9f91'],
@@ -29,7 +45,8 @@ const studio = (() => {
   const questPay = q => fees[q.difficulty || 'standard'];
   const reviewPay = 6, agendaPay = 10;
   const previewCredit = 0;
-  function wallet(s) {
+  const localCategories=['monitor','speaker','calendar','clock','gear'];
+  function wallet(s,previewRoom) {
     const done = s.quests.filter(q=>q.status==='done');
     const claims = new Set(Object.keys(s.agendaClaims || {}));
     for(const [key,value] of Object.entries(s.agendaDone || {})) if(value) claims.add(key);
@@ -49,7 +66,8 @@ const studio = (() => {
     }
     const fitted = {};
     for(const [category,rows] of Object.entries(catalog)){
-      const id = s.fittings?.[category];
+      const room=previewRoom || fitted.room;
+      const id=(localCategories.includes(category) && s.roomLooks?.[room+'-'+category]) || s.fittings?.[category];
       fitted[category] = owned.has(id) && items[id].category===category ? id : rows[0][0];
     }
     return {earned,total,spent,balance:total-spent,owned,fitted};
@@ -61,7 +79,9 @@ const studio = (() => {
       if(w.balance<item.price)throw Error('token이 부족해요.');
       s.purchases={...s.purchases,[uuid]:{id:uuid,sku:id,at:now,budget:w.total}};
     }
-    s.fittings={...s.fittings,[item.category]:id};
+    if(localCategories.includes(item.category)){
+      s.roomLooks={...s.roomLooks,[w.fitted.room+'-'+item.category]:id};
+    }else s.fittings={...s.fittings,[item.category]:id};
   }
   const baseIds = tracks.map(t=>t.id);
   const axisId = id=>baseIds.includes(id) || (typeof id==='string' && /^s-[a-f0-9-]{36}$/.test(id));
@@ -85,6 +105,9 @@ const studio = (() => {
     return map(s.purchases,(id,r)=>/^[a-f0-9-]{36}$/.test(id) && r?.id===id &&
       Object.hasOwn(items,r.sku) && items[r.sku].price>0 && safe(r.at) && safe(r.budget)) &&
       map(s.fittings,(key,id)=>Object.hasOwn(items,id) && items[id].category===key) &&
+      map(s.placements,(id,p)=>furniture.positionsKey(id) && p && safe(p.x) && p.x<360 && safe(p.y) && p.y<166) &&
+      map(s.roomLooks,(id,sku)=>Object.hasOwn(items,sku) && localCategories.includes(items[sku].category) &&
+        Object.hasOwn(furniture.rooms,id.split('-')[0]) && id===id.split('-')[0]+'-'+items[sku].category) &&
       map(s.agendaClaims,(key,v)=>/^(l-[0-9a-f-]{36}|g-[0-9a-f]{64})$/.test(key) && v===true) &&
       map(s.skillDefs,(id,d)=>axisId(id) && d?.id===id && baseIds.includes(d.base) &&
         typeof d.name==='string' && !!d.name.trim() && d.name.length<=32 && typeof d.visible==='boolean' && safe(d.created)) &&
