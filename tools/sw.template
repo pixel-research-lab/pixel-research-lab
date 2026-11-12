@@ -10,6 +10,8 @@ self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(cacheName);
     await cache.addAll(urls.map(url => new Request(url, {cache:'reload'})));
+    // The next navigation can use the complete update even while another lab tab is open.
+    await self.skipWaiting();
   })());
 });
 
