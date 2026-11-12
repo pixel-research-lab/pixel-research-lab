@@ -21,17 +21,21 @@ function createStudioUI({getState,show,toast,commit,escapeHTML:esc}){
       '<div class="studio-grid">'+studio.catalog[category].map(([id,name,price,desc,color])=>
         '<button data-studio-item="'+id+'" aria-pressed="'+(id===choice)+'"><i aria-hidden="true" style="background:'+color+'"></i><span>'+name+
         '<small>'+(w.fitted[category]===id?'사용 중':w.owned.has(id)?'보유 중':price+' token')+'</small></span></button>').join('')+'</div>'+
-      '<div class="studio-checkout"><div><strong>'+item.name+'</strong><p>'+item.description+'</p></div>'+
+      '<div class="studio-checkout"><div><strong>'+item.name+'</strong><p>'+(category==='room'?furniture.rooms[choice].details+' 포함':item.description)+'</p></div>'+
       '<button id="studio-buy" class="primary" '+(applied||(!owned&&w.balance<item.price)?'disabled':'')+'>'+
       (!owned&&w.balance<item.price?number(item.price-w.balance)+' token 부족':label)+'</button></div>');
-    paintRoom(s.slots,new Date(),{...w.fitted,[category]:choice},$('studio-preview'));
+    const looks=category==='room'?studio.wallet(s,choice).fitted:w.fitted;
+    paintRoom(s.slots,new Date(),{...looks,[category]:choice,placements:s.placements},$('studio-preview'));
     document.querySelectorAll('[data-studio-tab]').forEach(b=>b.onclick=()=>{category=b.dataset.studioTab;choice=null;shop();});
     document.querySelectorAll('[data-studio-item]').forEach(b=>b.onclick=()=>{choice=b.dataset.studioItem;shop();});
     $('studio-buy').onclick=async e=>{
       if(saving)return;saving=true;e.currentTarget.disabled=true;
       const uid=window.pixelAccount.uid;
       try{
-        await commit(next=>studio.equip(next,item.id,crypto.randomUUID(),Date.now()));
+        await commit(next=>{
+          if(studio.wallet(next).fitted.room!==w.fitted.room)throw Error('연구실이 바뀌었어요. 현재 방에서 다시 선택해 주세요.');
+          studio.equip(next,item.id,crypto.randomUUID(),Date.now());
+        });
         if(uid===window.pixelAccount.uid && $('modal').open && $('studio-preview')){
           shop();toast(category==='room'?item.name+'로 이사했어요.':item.name+' 적용 완료');
         }
