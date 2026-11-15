@@ -59,7 +59,7 @@ function updateClock(){
  const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
  const day=reviewSchedule.today(date);
  if(reviewDay!==day){paintReviews(day);reviewDay=day;}
- if(home && paintedMinute!==minute){paintRoom(state.slots,date,{...studio.wallet(state).fitted,placements:state.placements});paintedMinute=minute;petUI.refresh();}
+ if(home && paintedMinute!==minute){paintRoom(state.slots,date,{...studio.wallet(state).fitted,placements:state.placements,powered:studyDay.status!=='idle'});paintedMinute=minute;petUI.refresh();}
  if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
  const second=Math.floor(now/1000);
  if(recordedSecond===second)return;
@@ -551,5 +551,5 @@ pixelAccount.init({
  status:(s,email)=>{$('save-state').textContent=s;$('account-open').textContent=email?'내 계정':'로그인';if($('account-state'))$('account-state').textContent=s;}
 });
 if(!loaded)$('save-state').textContent='현재 창에만 저장';render();
-roomImagesReady.then(()=>paintRoom(state.slots,new Date(),{...studio.wallet(state).fitted,placements:state.placements}));
+roomImagesReady.then(()=>paintRoom(state.slots,new Date(),{...studio.wallet(state).fitted,placements:state.placements,powered:attendance.timeline(state.attendance).status!=='idle'}));
 })();

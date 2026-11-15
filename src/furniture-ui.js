@@ -17,7 +17,7 @@ function arrangeFurniture({getState,show,commit,toast}){
   }
   function redraw(){
     const placements=Object.fromEntries(Object.entries(points).map(([k,p])=>[room+'-'+k,p]));
-    paintRoom(initial.slots,new Date(),{...look,placements},canvas);
+    paintRoom(initial.slots,new Date(),{...look,placements,powered:attendance.timeline(getState().attendance).status!=='idle'},canvas);
     for(const [k,btn] of Object.entries(buttons))furniture.cssBox(btn,furniture.rect(look,k,points[k]));
   }
   function move(k,x,y){

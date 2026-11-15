@@ -1,7 +1,7 @@
 // Run against the guest furniture preview. Exercise real mouse and touch coordinates.
 const {chromium}=require('playwright'), assert=require('node:assert/strict');
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROME_BIN});
+ const browser=await chromium.launch();
  try{
   const page=await browser.newPage({viewport:{width:1280,height:900},hasTouch:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));

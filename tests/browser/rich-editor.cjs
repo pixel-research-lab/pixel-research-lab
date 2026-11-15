@@ -1,4 +1,4 @@
-// Run against a seeded guest preview, with Playwright and optionally CHROME_BIN on PATH.
+// Run against a seeded guest preview, with Playwright and its installed headless shell.
 const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require('node:crypto');
 const png=fs.readFileSync(require.resolve('../../assets/images/mascot.png'));
 const sha=crypto.createHash('sha256').update(png).digest('hex');
@@ -35,7 +35,7 @@ async function dragWidth(page,figure,targetPercent,touch=false){
   assert.ok(Math.abs(actual.height-actual.width/ratio)<=1,'preserve original aspect ratio');
 }
 async function main(){
-  const browser=await chromium.launch({executablePath:process.env.CHROME_BIN || undefined});
+  const browser=await chromium.launch();
   try{
     const errors=[];
     async function open(mobile=false){

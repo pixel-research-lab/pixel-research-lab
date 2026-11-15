@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const base=process.argv[2]||'http://127.0.0.1:18954/';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lWsAAAAASUVORK5CYII=','base64');
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||undefined});
+ const browser=await chromium.launch();
  try{
   const issues=[];
   async function page(demo,mobile=false){

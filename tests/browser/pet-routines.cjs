@@ -3,7 +3,7 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 
 (async()=>{
-  const browser=await chromium.launch({executablePath:process.env.CHROME_BIN});
+  const browser=await chromium.launch();
   try{
     const page=await browser.newPage({viewport:{width:390,height:844}});
     const errors=[];

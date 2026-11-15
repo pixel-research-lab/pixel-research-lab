@@ -19,7 +19,7 @@ async function dragCorner(page,img,corner,dx){
 
 async function main(){
   const engine=process.argv[3] || 'chromium';
-  const browser=await ({chromium,webkit}[engine]).launch(engine==='chromium'?{executablePath:process.env.CHROME_BIN}: {});
+  const browser=await ({chromium,webkit}[engine]).launch();
   try{
     const p=await browser.newPage({viewport:{width:1320,height:850}});
     const url=new URL(process.argv[2]);url.searchParams.set('demo','image-size');
