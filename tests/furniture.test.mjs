@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {changes,emptyLab,materialize} from '../cloud/model.js';
-const code=['data','reviews','furniture','studio'].map(n=>readFileSync(new URL('../src/'+n+'.js',import.meta.url),'utf8')).join('\n');
+const code=['data','reviews','furniture','gpu','studio'].map(n=>readFileSync(new URL('../src/'+n+'.js',import.meta.url),'utf8')).join('\n');
 const {studio,furniture}=runInNewContext(code+'\n;({studio,furniture})');
 test('legacy equipment persists and returning to a room restores its local finish and coordinates',()=>{
  const base={...emptyLab(),quests:Array.from({length:15},(_,i)=>({id:'q'+i,status:'done',track:'read',difficulty:'hard',loot:'mug'}))};

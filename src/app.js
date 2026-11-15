@@ -37,7 +37,7 @@ function render(){
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
- materials.paint();materials.paintInline();studioUI.paint();comms.paint();reviewDay=null;resetClockView();
+ materials.paint();materials.paintInline();studioUI.paint();gpuUI.paint();comms.paint();reviewDay=null;resetClockView();
 }
 // Browsing filters are local UI state; they do not alter the saved collection.
 let lootGroup='',ownedLootOnly=false;
@@ -55,14 +55,14 @@ function paintLoot(){
 $('loot-group').innerHTML='<option value="">전체 분류</option>'+Object.entries(lootGroups).map(([id,name])=>'<option value="'+id+'">'+name+'</option>').join('');
 $('loot-group').onchange=e=>{lootGroup=e.target.value;paintLoot();};
 $('loot-owned').onchange=e=>{ownedLootOnly=e.target.checked;paintLoot();};
-let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
+let reviewDay, studyDay, paintedMinute, paintedGPUSecond, recordedSecond, loggedMinute;
 let writingShift=false;
 const shiftActions={
  idle:['start','연구 시작'], working:['pause','잠시 비움'], paused:['resume','연구 재개']
 };
 function resetClockView(){
  studyDay=attendance.timeline(state.attendance);
- paintedMinute=recordedSecond=loggedMinute=null;
+ paintedMinute=paintedGPUSecond=recordedSecond=loggedMinute=null;
  updateClock();
 }
 function updateClock(){
@@ -70,11 +70,18 @@ function updateClock(){
  const date=new Date(),now=date.getTime(),minute=Math.floor(now/60000);
  const day=reviewSchedule.today(date);
  if(reviewDay!==day){paintReviews(day);reviewDay=day;}
- if(home && paintedMinute!==minute){paintRoom(state.slots,date,{...studio.wallet(state).fitted,placements:state.placements,powered:studyDay.status!=='idle'});paintedMinute=minute;petUI.refresh();}
+ const powered=studyDay.status!=='idle',looks=studio.wallet(state).fitted;
+ const animateGPU=looks.gpu && powered && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+ if(home && (paintedMinute!==minute || (animateGPU && paintedGPUSecond!==date.getSeconds()))){
+   paintRoom(state.slots,date,{...looks,placements:state.placements,powered});
+   if(paintedMinute!==minute)petUI.refresh();
+   paintedMinute=minute;paintedGPUSecond=date.getSeconds();
+ }
  if(!home && loggedMinute!==minute){paintShiftLog(date);loggedMinute=minute;}
  const second=Math.floor(now/1000);
  if(recordedSecond===second)return;
  recordedSecond=second;
+ gpuUI.power(powered,looks.gpu);
  $('study-total').textContent=attendance.duration(attendance.dayTotal(studyDay,date,now));
  const last=studyDay.accepted.at(-1);
  const status=studyDay.status, [action,label]=shiftActions[status];
@@ -464,6 +471,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-do]');if(
  switch(act){
  case 'books':shelf.list();break;
  case 'comms':comms.open();break;
+ case 'gpu':gpuUI.open();break;
  case 'arrange':arrangeFurniture({getState:()=>state,show,commit,toast});break;case 'studio':studioUI.shop();break;case 'axes':studioUI.settings();break;
  case 'review-files':show('복습 관리','복습 자료 관리',reviewRows().map(r=>b(r.card.question,'edit-review-files','secondary',r.card.id)).join(' '));break;
  case 'edit-review-files':{const c=reviewById(arg);if(c)show('복습 자료 관리',reviewTitle(c),richBody.view(c.questionBody,c.id,'prompt')+materials.section(arg,'prompt')+'<h3>기억하고 싶은 답</h3>'+(richBody.view(c.answerBody,c.id,'answer')||'<p>'+escapeHTML(c.answer)+'</p>')+materials.section(arg,'answer')+b('목록','review-files'));break;}
@@ -551,6 +559,7 @@ const comms=createComms({get:()=>state,show,commit,toast,owner:fileOwner,esc:esc
 const shiftManager=createAttendanceUI({getState:()=>state,show,commit});
 const petUI=createPetUI({getState:()=>state,show,commit,toast});
 const studioUI=createStudioUI({getState:()=>state,show,toast,escapeHTML,commit});
+const gpuUI=createGPUUI({getState:()=>state,show,commit,toast});
 const planner=createPlanner({getState:()=>state,show,toast,escapeHTML,commit});
 pixelAccount.init({
  readGuest:pixelAccountGuest,copyGuestFiles:(g,uid)=>labFiles.copy(g,'guest:'+key,uid),

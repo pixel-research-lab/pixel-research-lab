@@ -39,8 +39,8 @@ const studio = (() => {
       ['dual','듀얼 모니터',100,'두 번째 화면에 펼친 실험 그래프','#887e9a'],
       ['bench','분석 워크스테이션',160,'듀얼 모니터와 노트북을 함께 배치','#a78359']]
   };
-  const items = Object.fromEntries(Object.entries(catalog).flatMap(([category,rows]) =>
-    rows.map(([id,name,price,description,color])=>[id,{id,category,name,price,description,color}])));
+  const items = {...Object.fromEntries(Object.entries(catalog).flatMap(([category,rows]) =>
+    rows.map(([id,name,price,description,color])=>[id,{id,category,name,price,description,color}]))),...gpuLab.items};
   const fees = {easy:15,standard:30,hard:60};
   const questPay = q => fees[q.difficulty || 'standard'];
   const reviewPay = 6, agendaPay = 10;
@@ -54,13 +54,13 @@ const studio = (() => {
       + (s.reviews||[]).reduce((sum,c)=>sum+reviewSchedule.progress(c).correctTurns*reviewPay,0)
       + claims.size*agendaPay;
     const total = earned + previewCredit;
-    const owned = new Set(Object.values(items).filter(i=>i.price===0).map(i=>i.id));
+    const owned = new Set(Object.values(items).filter(i=>i.price===0 && !i.requires).map(i=>i.id));
     let spent = 0;
     // Offline devices can spend the same balance. Replay within each purchaser's observed budget.
     const receipts = Object.values(s.purchases || {}).sort((a,b)=>a.budget-b.budget || a.at-b.at || a.id.localeCompare(b.id));
     for(const r of receipts){
       const item = items[r.sku];
-      if(item && !owned.has(item.id) && spent+item.price<=Math.min(total,r.budget)){
+      if(item && !item.requires && !owned.has(item.id) && spent+item.price<=Math.min(total,r.budget)){
         owned.add(item.id);spent+=item.price;
       }
     }
@@ -70,15 +70,32 @@ const studio = (() => {
       const id=(localCategories.includes(category) && s.roomLooks?.[room+'-'+category]) || s.fittings?.[category];
       fitted[category] = owned.has(id) && items[id].category===category ? id : rows[0][0];
     }
+    // Assembly is free, but only accepted component purchases can unlock a GPU.
+    // The latest assembly/equip receipt selects the GPU; no extra cloud record type is needed.
+    fitted.gpu=null;
+    for(const r of receipts.slice().sort((a,b)=>a.at-b.at || a.id.localeCompare(b.id))){
+      const item=items[r.sku];
+      if(item?.requires && item.requires.every(id=>owned.has(id))){
+        owned.add(item.id);fitted.gpu=item.id;
+      }
+    }
     return {earned,total,spent,balance:total-spent,owned,fitted};
   }
-  function equip(s,id,uuid,now){
+  function buy(s,id,uuid,now){
     const item=items[id], w=wallet(s);
     if(!item)throw Error('카탈로그에서 항목을 찾지 못했어요.');
-    if(!w.owned.has(id)){
+    if(item.requires && !item.requires.every(part=>w.owned.has(part)))throw Error('부품 네 가지를 모두 모아야 조립할 수 있어요.');
+    if(!w.owned.has(id) || (item.requires && w.fitted.gpu!==id)){
       if(w.balance<item.price)throw Error('token이 부족해요.');
-      s.purchases={...s.purchases,[uuid]:{id:uuid,sku:id,at:now,budget:w.total}};
+      // A just-selected GPU wins even when the clock is unchanged or behind a synced device.
+      const at=item.requires?Object.values(s.purchases||{}).reduce((time,r)=>items[r.sku]?.requires?Math.max(time,r.at+1):time,now):now;
+      s.purchases={...s.purchases,[uuid]:{id:uuid,sku:id,at,budget:w.total}};
     }
+  }
+  function equip(s,id,uuid,now){
+    buy(s,id,uuid,now);
+    const item=items[id], w=wallet(s);
+    if(item.category==='gpu' || item.category==='gpu-part')return;
     if(localCategories.includes(item.category)){
       s.roomLooks={...s.roomLooks,[w.fitted.room+'-'+item.category]:id};
     }else s.fittings={...s.fittings,[item.category]:id};
@@ -103,7 +120,7 @@ const studio = (() => {
     const safe=n=>Number.isSafeInteger(n) && n>=0;
     const focus=x=> x===undefined || x===null || axisId(x);
     return map(s.purchases,(id,r)=>/^[a-f0-9-]{36}$/.test(id) && r?.id===id &&
-      Object.hasOwn(items,r.sku) && items[r.sku].price>0 && safe(r.at) && safe(r.budget)) &&
+      Object.hasOwn(items,r.sku) && (items[r.sku].price>0 || !!items[r.sku].requires) && safe(r.at) && safe(r.budget)) &&
       map(s.fittings,(key,id)=>Object.hasOwn(items,id) && items[id].category===key) &&
       map(s.placements,(id,p)=>furniture.positionsKey(id) && p && safe(p.x) && p.x<360 && safe(p.y) && p.y<166) &&
       map(s.roomLooks,(id,sku)=>Object.hasOwn(items,sku) && localCategories.includes(items[sku].category) &&
@@ -114,5 +131,5 @@ const studio = (() => {
       s.quests.every(q=>q && focus(q.focusSkill) && (q.difficulty===undefined || Object.hasOwn(fees,q.difficulty))) &&
       (s.reviews||[]).every(c=>c && focus(c.focusSkill));
   }
-  return {categories,catalog,items,fees,questPay,reviewPay,agendaPay,previewCredit,wallet,equip,axes,scores,valid};
+  return {categories,catalog,items,fees,questPay,reviewPay,agendaPay,previewCredit,wallet,buy,equip,axes,scores,valid};
 })();

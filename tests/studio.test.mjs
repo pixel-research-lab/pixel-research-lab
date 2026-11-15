@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {emptyLab,changes,materialize} from '../cloud/model.js';
 
-const source = ['data','reviews','studio'].map(n=>readFileSync(new URL('../src/'+n+'.js',import.meta.url),'utf8')).join('\n');
+const source = ['data','reviews','gpu','studio'].map(n=>readFileSync(new URL('../src/'+n+'.js',import.meta.url),'utf8')).join('\n');
 const shop=runInNewContext(source+'\nstudio');
 const paid=(n,difficulty='standard')=>Array.from({length:n},(_,i)=>({id:'quest'+i,status:'done',track:'read',loot:'mug',difficulty}));
 const uuid=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
