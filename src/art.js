@@ -89,7 +89,7 @@ function paintRoom(slots,date=new Date(),appearance={},c=document.getElementById
  drawBench(R,appearance.room,room);
  for(let i=0;i<17;i++){R(270+i,96-i,3,3,edge);R(285-i,79-Math.floor(i*.65),3,2,dark);}
  R(263,66,12,3,'#ad6d42');R(261,69,14,4,'#dfab60');R(259,73,18,2,'#f0c77d');R(261,75,13,1,lampOn?'#f7db97':'#9a845e');R(269,98,4,4,edge);R(264,101,16,2,dark);
- if(appearance.room==='studio'||appearance.room==='garden'){
+ if(!appearance.gpu && (appearance.room==='studio'||appearance.room==='garden')){
    R(322,119,25,23,edge);R(324,121,21,19,'#92a188');R(324,122,20,2,'#acb299');R(333,129,5,2,edge);R(321,140,27,2,dark);
  }
  drawChair(R,appearance.room,room);
@@ -108,6 +108,7 @@ function paintRoom(slots,date=new Date(),appearance={},c=document.getElementById
    R(246,103,41,1,'#ffe4a1');R(250,104,32,1,'#f8ce84');q.restore();
  }
  drawEquipment(R,appearance,pos,date);
+ drawGPURig(R,appearance.gpu,!!appearance.powered,date);
  if(c.id==='room-art')furniture.placeHotspots(appearance,pos);
- c.setAttribute('aria-label',sky.label+' 풍경의 작업 책상. 모니터 '+(appearance.powered?'켜짐':'꺼짐')+', 스탠드 '+(lampOn?'켜짐':'꺼짐')+'. '+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
+ c.setAttribute('aria-label',sky.label+' 풍경의 작업 책상. 모니터 '+(appearance.powered?'켜짐':'꺼짐')+', 스탠드 '+(lampOn?'켜짐':'꺼짐')+'. '+(gpuLab.get(appearance.gpu)?gpuLab.get(appearance.gpu).name+' '+(appearance.powered?'가동 중':'전원 꺼짐')+'. ':'')+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
 }

@@ -1,0 +1,22 @@
+#modal:has(#gpu-workshop){width:min(820px,calc(100% - 20px))}
+.gpu-strip{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--paper);border-top:1px solid var(--line)}
+#gpu-status{font-size:12px;color:var(--sub)}
+#gpu-hotspot{left:87.78%;top:65.06%;width:10%;height:23.5%}
+.gpu-models{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}
+.gpu-models button{padding:10px 8px;background:var(--paper);border:1px solid var(--line);text-align:left;min-width:0}
+.gpu-models button[aria-pressed=true]{border-color:var(--leaf);box-shadow:inset 0 0 0 1px var(--leaf);background:var(--soft)}
+.gpu-models small{display:block;color:var(--sub);font-size:12px}
+.gpu-blueprint{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center;background:#e7ead7;border:1px solid #b6bfa3;padding:18px}
+.gpu-blueprint canvas{width:100%;height:auto;image-rendering:pixelated}
+.gpu-blueprint small{font-size:12px;color:#63735b}.gpu-blueprint h3{margin:2px 0 6px;color:#2d493b}
+.gpu-blueprint p{font-size:13px;color:#536550;margin-bottom:10px}
+.gpu-blueprint strong{font-size:13px;color:#395e46}.gpu-blueprint progress{display:block;width:100%;height:7px;margin-top:5px;accent-color:#668c66}
+.gpu-parts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
+.gpu-part{display:grid;grid-template-columns:32px minmax(0,1fr);gap:7px;padding:12px;border:1px solid var(--line);background:var(--paper)}
+.gpu-part[data-collected=true]{border-color:#91aa82}
+.gpu-part-icon{font:27px ui-monospace,monospace;color:var(--leaf)}
+.gpu-part h4{font-size:14px;margin:0}.gpu-part p,.gpu-part small{font-size:12px;color:var(--sub)}
+.gpu-part small{display:block;font-weight:700;margin-top:5px}.gpu-part button{grid-column:1/-1;min-height:36px}
+.gpu-checkout{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px dashed var(--line);padding-top:12px}
+.gpu-checkout p,.gpu-note{font-size:12px;color:var(--sub)}.gpu-checkout button{flex:none}.gpu-note{margin-top:12px}
+@media(max-width:530px){.gpu-blueprint{grid-template-columns:1fr;gap:8px;padding:12px}.gpu-blueprint canvas{max-width:300px;margin:auto}.gpu-models{gap:5px}.gpu-models button{padding:8px 5px;font-size:13px}.gpu-models small{font-size:11px}.gpu-checkout{align-items:flex-start;flex-direction:column}.gpu-strip{align-items:flex-start}.gpu-strip button{flex:none}}
