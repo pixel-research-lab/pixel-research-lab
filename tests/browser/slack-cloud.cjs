@@ -2,7 +2,7 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const base=process.argv[2]||'http://127.0.0.1:18976/';
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||undefined});
+ const browser=await chromium.launch();
  const notices=[],linked=new Set(),requests=[],errors=[];let approvals=0;
  async function device(uid,windows=false){
    const context=await browser.newContext({serviceWorkers:'block',...(windows?{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'}:{})});

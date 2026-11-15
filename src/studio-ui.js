@@ -25,7 +25,7 @@ function createStudioUI({getState,show,toast,commit,escapeHTML:esc}){
       '<button id="studio-buy" class="primary" '+(applied||(!owned&&w.balance<item.price)?'disabled':'')+'>'+
       (!owned&&w.balance<item.price?number(item.price-w.balance)+' token 부족':label)+'</button></div>');
     const looks=category==='room'?studio.wallet(s,choice).fitted:w.fitted;
-    paintRoom(s.slots,new Date(),{...looks,[category]:choice,placements:s.placements},$('studio-preview'));
+    paintRoom(s.slots,new Date(),{...looks,[category]:choice,placements:s.placements,powered:attendance.timeline(s.attendance).status!=='idle'},$('studio-preview'));
     document.querySelectorAll('[data-studio-tab]').forEach(b=>b.onclick=()=>{category=b.dataset.studioTab;choice=null;shop();});
     document.querySelectorAll('[data-studio-item]').forEach(b=>b.onclick=()=>{choice=b.dataset.studioItem;shop();});
     $('studio-buy').onclick=async e=>{

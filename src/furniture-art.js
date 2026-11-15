@@ -33,28 +33,30 @@ function drawChair(R,id,room){
   if(id!=='studio'){R(x-4,128,3,9,frame);R(x+w+1,128,3,9,frame);R(x-5,127,7,2,seat);R(x+w-3,127,7,2,seat);}
   R(x+3,148,w-6,2,frame);R(x+1,150,5,2,'#39493f');R(x+w-6,150,5,2,'#39493f');
 }
-function drawScreen(R,x,y,w,room,skin){
+function drawScreen(R,x,y,w,room,skin,powered=false){
   const graphite=skin==='graphite',amber=skin==='amber';
   const frame=amber?'#92765e':graphite?'#384653':room.frame;
   const ink=amber?'#e7b264':graphite?'#aad6d0':'#b7ca9e';
   R(x+1,y+1,w,38,'#778978');R(x,y,w,38,frame);
   R(x+2,y+2,w-4,33,amber?'#dbc9a6':graphite?'#5e6a78':room.rim);
-  R(x+4,y+4,w-8,28,amber?'#3c352c':graphite?'#354856':'#3e6356');
-  for(let i=0;i<4;i++)R(x+7,y+7+i*4,Math.round((w-12)*[.59,.28,.13,.21][i]),i===0?2:1,ink);
-  const a=x+Math.floor(w*.56);
-  if(graphite){for(let i=0;i<w*.32;i++)R(a+i,y+20-Math.round(4*Math.sin(i*.43)),1,1,ink);}
-  else if(amber){R(a,y+21,3,1,ink);R(a+6,y+22,5,2,ink);}
-  else{R(a,y+13,9,2,ink);R(a,y+15,2,5,ink);R(a+7,y+15,2,5,ink);R(a+2,y+21,5,5,'#cc9968');}
-  R(x+w-8,y+35,3,1,ink);R(x+Math.floor(w/2)-3,y+38,6,6,frame);R(x+Math.floor(w/2)-9,y+44,18,2,frame);
+  R(x+4,y+4,w-8,28,!powered?'#222b2b':amber?'#3c352c':graphite?'#354856':'#3e6356');
+  if(powered){
+    for(let i=0;i<4;i++)R(x+7,y+7+i*4,Math.round((w-12)*[.59,.28,.13,.21][i]),i===0?2:1,ink);
+    const a=x+Math.floor(w*.56);
+    if(graphite){for(let i=0;i<w*.32;i++)R(a+i,y+20-Math.round(4*Math.sin(i*.43)),1,1,ink);}
+    else if(amber){R(a,y+21,3,1,ink);R(a+6,y+22,5,2,ink);}
+    else{R(a,y+13,9,2,ink);R(a,y+15,2,5,ink);R(a+7,y+15,2,5,ink);R(a+2,y+21,5,5,'#cc9968');}
+  }
+  R(x+w-8,y+35,3,1,powered?ink:'#48534d');R(x+Math.floor(w/2)-3,y+38,6,6,frame);R(x+Math.floor(w/2)-9,y+44,18,2,frame);
   R(x+Math.floor(w*.19),y+47,Math.round(w*.60),2,'#81887c');
   for(let i=0;i<w*.5;i+=4)R(x+Math.ceil(w*.23)+i,y+47,2,1,'#dedbc5');
 }
 function drawEquipment(R,look,pos,date){
   const room=furniture.rooms[look.room];
   const mon=furniture.rect(look,'monitor',pos.monitor);
-  drawScreen(R,mon.x,mon.y,mon.w,room,look.monitor);
+  drawScreen(R,mon.x,mon.y,mon.w,room,look.monitor,look.powered);
   for(const [id,variant,ox,oy] of [['aux','dual',106,100],['laptop','laptop',50,103]]){
-    if(pos[id])drawGear((x,y,w,h,c)=>R(x+pos[id].x-ox,y+pos[id].y-oy,w,h,c),variant);
+    if(pos[id])drawGear((x,y,w,h,c)=>R(x+pos[id].x-ox,y+pos[id].y-oy,w,h,c),variant,look.powered);
   }
   const calendar=furniture.rect(look,'calendar',pos.calendar),cx=calendar.x,cy=calendar.y;
   const night=look.calendar==='midnight',green=look.calendar==='botanic';

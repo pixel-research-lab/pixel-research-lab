@@ -42,6 +42,7 @@ function paintRoom(slots,date=new Date(),appearance={},c=document.getElementById
  const room=furniture.rooms[appearance.room], pos=furniture.positions(appearance,appearance.placements);
  const R=(x,y,w,h,col)=>{q.fillStyle=col;q.fillRect(x,y,w,h)};
  const sky=skyAt(date), [top,mid,low,horizon,far,near,trunk,leaf]=sky.colors;
+ const lampOn=!!appearance.powered && sky.moon;
  const wall='#a6b39a',line='#33483e',shadow='#6d826f',wood='#ba895e',bright='#e1b47f',dark='#755b46',edge='#554e40';
  R(0,0,360,166,wall);
  for(let y=3;y<116;y+=12)for(let x=3+(y%2)*4;x<360;x+=12){R(x,y,1,1,'#93a58b');R(x+1,y+1,1,1,'#c0c7a5');}
@@ -87,7 +88,7 @@ function paintRoom(slots,date=new Date(),appearance={},c=document.getElementById
  for(const [x,y,col] of [[245,19,'#e5c984'],[262,17,'#d8d6ab'],[276,22,'#eddfb0'],[260,34,'#e8ba8a']]){R(x+1,y+1,13,12,'#ab8f69');R(x,y,13,12,col);R(x+5,y-1,2,2,'#885a45');R(x+2,y+4,7,1,'#9b9475');R(x+2,y+7,5,1,'#9b9475');}
  drawBench(R,appearance.room,room);
  for(let i=0;i<17;i++){R(270+i,96-i,3,3,edge);R(285-i,79-Math.floor(i*.65),3,2,dark);}
- R(263,66,12,3,'#ad6d42');R(261,69,14,4,'#dfab60');R(259,73,18,2,'#f0c77d');R(261,75,13,1,'#f7db97');R(269,98,4,4,edge);R(264,101,16,2,dark);
+ R(263,66,12,3,'#ad6d42');R(261,69,14,4,'#dfab60');R(259,73,18,2,'#f0c77d');R(261,75,13,1,lampOn?'#f7db97':'#9a845e');R(269,98,4,4,edge);R(264,101,16,2,dark);
  if(appearance.room==='studio'||appearance.room==='garden'){
    R(322,119,25,23,edge);R(324,121,21,19,'#92a188');R(324,122,20,2,'#acb299');R(333,129,5,2,edge);R(321,140,27,2,dark);
  }
@@ -98,13 +99,15 @@ function paintRoom(slots,date=new Date(),appearance={},c=document.getElementById
    else R(positions[i]+4,102,12,1,'#a98a67');
  });
  if(sky.dim>0){
-   q.save();q.globalAlpha=.34*sky.dim;R(0,0,360,166,'#162641');
-   q.globalAlpha=.19*sky.dim;
+   q.save();q.globalAlpha=.34*sky.dim;R(0,0,360,166,'#162641');q.restore();
+ }
+ if(lampOn){
+   q.save();q.globalAlpha=.19*sky.dim;
    for(let i=0;i<27;i++){const w=9+Math.floor(i*.66);R(267-w,76+i,w*2,1,'#ffe7a3');}
    q.globalAlpha=.62*sky.dim;R(259,73,18,2,'#ffe09a');R(261,75,14,1,'#fff3bc');
    R(246,103,41,1,'#ffe4a1');R(250,104,32,1,'#f8ce84');q.restore();
  }
  drawEquipment(R,appearance,pos,date);
  if(c.id==='room-art')furniture.placeHotspots(appearance,pos);
- c.setAttribute('aria-label',sky.label+' 풍경의 작업 책상. '+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
+ c.setAttribute('aria-label',sky.label+' 풍경의 작업 책상. 모니터 '+(appearance.powered?'켜짐':'꺼짐')+', 스탠드 '+(lampOn?'켜짐':'꺼짐')+'. '+slots.map((id,i)=>(i+1)+'번 자리 '+(id?lootDefs[id][0]:'비어 있음')).join(', '));
 }
