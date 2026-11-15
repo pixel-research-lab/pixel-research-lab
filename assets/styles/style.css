@@ -79,3 +79,10 @@ dialog{background:var(--paper);border:2px solid var(--deep);border-radius:5px;co
 .log-week button { justify-content:space-between; padding:7px 10px; background:var(--paper); border:1px solid var(--soft); }
 .log-week button[aria-pressed="true"] { background:#e4ead8; border-color:#769575; }
 .form-error { color:#8f3e28; }
+
+/* Keep a growing collection browsable without stretching the whole dashboard. */
+.loot-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px 0;font-size:13px}
+.loot-tools label{display:flex;align-items:center;gap:5px}.loot-tools select{max-width:100%;padding:6px;background:var(--paper);border:1px solid var(--line)}
+.loot-tools small{color:var(--sub);margin-left:auto}#loot{max-height:420px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.loot-empty{grid-column:1/-1;color:var(--sub);padding:12px 0}.inventory{max-height:260px;overflow-y:auto;overscroll-behavior:contain}
+@media(max-width:660px){.loot-tools select,.loot-tools label{min-height:40px}}

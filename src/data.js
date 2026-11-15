@@ -13,13 +13,65 @@ const requests=[
  ['작은 재현 실험','같은 자료와 절차로 다시 실행하면 결과가 얼마나 일치할까?','code',0],
  ['그림 한 장의 한계','내 실험 그림과 캡션만 읽어도 관측한 결과와 아직 모르는 점이 구분될까?','write',0]
 ];
+// IDs are permanent: existing quest rewards, inventory and desk saves use these keys.
+const lootGroups={nature:'초록과 자연',research:'연구 도구',tech:'작은 기계',cozy:'티타임',cosmos:'우주와 탐험'};
 const lootDefs={
- plant:['새싹 화분','입실 선물. 연구실에 가장 먼저 도착한 동료.'],
- lens:['겹사진 렌즈','두 프레임 사이에 숨은 움직임을 찾는 렌즈.'],
- crab:['반례 집게','가설에서 빠져나간 예외를 집어 오는 작은 게.'],
- mug:['리뷰어 2호의 머그','옆면에 조그맣게 “이 결과만으로요?”가 적혀 있다.'],
- floppy:['체크포인트 디스켓','마지막으로 잘 돌아간 그 순간을 담은 디스켓.'],
- robot:['태엽 그리퍼','블록 하나를 집으려고 오늘도 출근한 로봇.'],
- scope:['관찰 일지 현미경','사소한 차이를 한 번 더 들여다보게 한다.']
+ plant:['새싹 화분','입실 선물. 연구실에 가장 먼저 도착한 동료.','nature'],
+ lens:['겹사진 렌즈','두 프레임 사이에 숨은 움직임을 찾는 렌즈.','research'],
+ crab:['반례 집게','가설에서 빠져나간 예외를 집어 오는 작은 게.','nature'],
+ mug:['리뷰어 2호의 머그','옆면에 조그맣게 “이 결과만으로요?”가 적혀 있다.','cozy'],
+ floppy:['체크포인트 디스켓','마지막으로 잘 돌아간 그 순간을 담은 디스켓.','tech'],
+ robot:['태엽 그리퍼','블록 하나를 집으려고 오늘도 출근한 로봇.','tech'],
+ scope:['관찰 일지 현미경','사소한 차이를 한 번 더 들여다보게 한다.','research'],
+ cactus:['느긋한 선인장','진도가 조금 느려도 자리를 지키는 초록 친구.','nature'],
+ bonsai:['작은 소나무','긴 호흡의 연구를 위한 아주 작은 숲.','nature'],
+ terrarium:['유리병 숲','책상 한 귀퉁이에 따로 보관한 산책 시간.','nature'],
+ sunflower:['햇살 해바라기','흐린 날에도 창 쪽을 바라보는 꽃.','nature'],
+ mushroom:['버섯 모형','데이터를 키우진 못하지만 책상은 풍성하게 한다.','nature'],
+ seashell:['바다 조개','귀를 대면 파도 대신 다음 아이디어가 들릴지도.','nature'],
+ butterfly:['나비 표본 액자','움직임을 관찰하다 남겨 둔 종이 나비.','nature'],
+ aquarium:['책상 어항','작은 물고기에게는 이곳이 한강뷰 연구실.','nature'],
+ notebook:['관찰 노트','틀린 예측도 지우지 않고 남기는 작은 노트.','research'],
+ books:['논문 산책 책더미','다 읽은 책과 곧 읽을 책이 사이좋게 쌓여 있다.','research'],
+ pencil:['아이디어 연필꽂이','생각이 떠오를 때마다 연필 한 자루가 준비된다.','research'],
+ ruler:['조건의 자','같은 조건으로 비교했는지 한 번 더 확인하는 자.','research'],
+ abacus:['검산 주판','계산이 너무 그럴듯할 때 꺼내는 마지막 친구.','research'],
+ hourglass:['몰입 모래시계','잠깐의 집중도 차곡차곡 쌓이는 모습.','research'],
+ beaker:['호기심 비커','정답 대신 좋은 질문이 담긴 초록빛 비커.','research'],
+ molecule:['연결 분자 모형','떨어져 보이던 아이디어 사이에 다리를 놓는다.','research'],
+ keyboard:['미니 키보드','아주 작은 엔터 키에도 실행할 용기가 담겼다.','tech'],
+ mouse:['클릭 마우스','수많은 시행착오를 함께 클릭한 조수.','tech'],
+ camera:['관찰 카메라','다시 보기 위해 오늘의 장면을 남긴다.','tech'],
+ cassette:['집중 믹스테이프','좋아하는 곡과 잘 풀리던 오후를 녹음한 테이프.','tech'],
+ gamepad:['실험 조이스틱','한 번 실패했다고 게임 오버는 아니다.','tech'],
+ circuit:['초록 회로 기판','작은 연결들이 모여 하나의 실험을 움직인다.','tech'],
+ battery:['충전 완료 배터리','내일의 나를 위해 오늘은 충분히 쉬어 가기.','tech'],
+ server:['꼬마 서버','한밤의 실험을 기다리는 손바닥만 한 서버.','tech'],
+ teapot:['느긋한 찻주전자','답이 떠오르지 않을 때 차부터 우려 보자.','cozy'],
+ coffee:['드립 커피 세트','한 방울씩 내려오는 오후의 집중력.','cozy'],
+ croissant:['버터 크루아상','어려운 문단을 넘긴 뒤 받는 바삭한 보상.','cozy'],
+ cookie:['초코칩 쿠키 병','작은 성취를 하나씩 꺼내 먹는 간식 병.','cozy'],
+ donut:['딸기 도넛','가운데 빈칸은 다음 질문을 위한 자리.','cozy'],
+ candle:['저녁 향초','오늘 잘한 일을 조용히 돌아보는 작은 불빛.','cozy'],
+ headphones:['집중 헤드폰','잠깐만요, 지금 좋은 생각이 떠오르고 있어요.','cozy'],
+ radio:['빈티지 라디오','채널을 돌리면 오래된 연구실의 오후가 나온다.','cozy'],
+ catlamp:['고양이 무드등','논문은 못 읽어도 밤샘의 표정은 잘 안다.','cozy'],
+ globe:['책상 지구본','내 질문과 닮은 질문이 어딘가에도 있을 거야.','cosmos'],
+ telescope:['별 찾는 망원경','잘 보이지 않는다고 없는 것은 아니니까.','cosmos'],
+ rocket:['첫 실험 로켓','작은 재현 하나가 다음 탐험의 출발점.','cosmos'],
+ satellite:['신호 위성','멀리 있는 아이디어에서 도착한 작은 신호.','cosmos'],
+ moon:['달 조각 스탠드','조금씩 모양을 바꾸며 계속 나아가는 달.','cosmos'],
+ meteor:['운석 표본','뜻밖의 관찰 하나가 연구실에 떨어졌다.','cosmos'],
+ planet:['고리 행성','생각이 빙빙 돌아도 발견할 궤도는 남아 있다.','cosmos'],
+ crystal:['발견의 수정','흐릿한 생각이 드디어 모양을 갖춘 순간.','cosmos'],
+ compass:['질문의 나침반','어디까지 아는지보다 다음에 어디를 볼지 알려 준다.','cosmos'],
+ trophy:['작은 완주 트로피','완벽한 결과보다 끝까지 남긴 기록을 기념한다.','cosmos']
 };
+function lootPool(inventory,title){
+ const eligible=Object.keys(lootDefs).filter(id=>id!=='plant');
+ // Preserve the introductory lens once; repeating that quest must still unlock new items.
+ if(!inventory.lens && (title===requests[0][0] || title==='사라진 한 프레임'))return ['lens'];
+ const unseen=eligible.filter(id=>!inventory[id]);
+ return unseen.length?unseen:eligible;
+}
 const ranks=['미습득','견습','독립','응용'];
