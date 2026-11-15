@@ -32,18 +32,29 @@ function render(){
   '<div class="board-empty">'+(!active.length?'<p>등록한 연구 퀘스트가 없어요.</p>':'')+b('의뢰 뽑기','reroll','textbtn')+'</div>';
  $('research-quests').innerHTML='<div class="board-inner">'+suggestion+(active.length?'<div class="running-label">내 퀘스트</div>'+active.map(q=>qRow(q,false)).join(''):'')+'</div>';
  $('skills').innerHTML=tracks.map(t=>{const totals=t.skills.map((_,i)=>stats(t.id,i));const n=totals.filter(s=>s.rank>=2).length, xp=totals.reduce((sum,s)=>sum+s.xp,0);return '<button class="skill-row" data-do="skill" data-arg="'+t.id+'">'+sprite(t.id,'skill-icon')+'<b>'+t.name+'</b><span class="hint">'+t.hint+'</span>'+(xp?'<span class="skill-xp">경험 '+xp+'</span>':'')+'<span class="skill-num">'+n+' / '+t.skills.length+' ›</span></button>'}).join('');
- const ids=Object.keys(lootDefs),owned=ids.filter(i=>state.inventory[i]);$('loot-count').textContent=owned.length+' / '+ids.length+'종';
- $('loot').innerHTML=ids.map(id=>{
-   const count=state.inventory[id]||0;
-   return '<button class="loot-cell" data-do="item" data-arg="'+id+'" data-owned="'+!!count+'">'+sprite(id)+
-     '<span>'+escapeHTML(lootDefs[id][0])+'</span><small>'+(count?'보유 ×'+count:'미획득')+'</small></button>';
- }).join('');
+ paintLoot();
 
  $('desk-summary').innerHTML=state.slots.map((i,n)=>'<span class="slot-bit '+(!i?'empty-bit':'')+'" aria-label="'+(n+1)+'번 자리"><i></i>'+(i?lootDefs[i][0]:'빈 자리')+'</span>').join('');
  $('done-count').textContent=done.length+'건';$('journal-rows').innerHTML=done.length?done.map(q=>qRow(q,true)).join(''):'<div class="empty-log">완료한 퀘스트의 예측과 관찰이 여기에 남아요.</div>';
  $('home').hidden=!home;$('journal').hidden=home;$('home-tab').toggleAttribute('aria-current',home);$('journal-tab').toggleAttribute('aria-current',!home);(home?$('home-tab'):$('journal-tab')).setAttribute('aria-current','page');
  materials.paint();materials.paintInline();studioUI.paint();comms.paint();reviewDay=null;resetClockView();
 }
+// Browsing filters are local UI state; they do not alter the saved collection.
+let lootGroup='',ownedLootOnly=false;
+function paintLoot(){
+ const ids=Object.keys(lootDefs),owned=ids.filter(id=>state.inventory[id]);
+ $('loot-count').textContent=owned.length+' / '+ids.length+'종';
+ const visible=ids.filter(id=>(!lootGroup || lootDefs[id][2]===lootGroup) && (!ownedLootOnly || state.inventory[id]));
+ $('loot').innerHTML=visible.map(id=>{
+   const count=state.inventory[id]||0;
+   return '<button class="loot-cell" data-do="item" data-arg="'+id+'" data-owned="'+!!count+'">'+sprite(id)+
+     '<span>'+escapeHTML(lootDefs[id][0])+'</span><small>'+(count?'보유 ×'+count:'미획득')+'</small></button>';
+ }).join('') || '<p class="loot-empty">이 분류에서 아직 얻은 전리품이 없어요.</p>';
+ $('loot-visible').textContent=visible.length+'종 표시';
+}
+$('loot-group').innerHTML='<option value="">전체 분류</option>'+Object.entries(lootGroups).map(([id,name])=>'<option value="'+id+'">'+name+'</option>').join('');
+$('loot-group').onchange=e=>{lootGroup=e.target.value;paintLoot();};
+$('loot-owned').onchange=e=>{ownedLootOnly=e.target.checked;paintLoot();};
 let reviewDay, studyDay, paintedMinute, recordedSecond, loggedMinute;
 let writingShift=false;
 const shiftActions={
@@ -373,7 +384,7 @@ function quest(id){
  const draft=()=>{q.draft={finding:$('finding').value,verdict:$('verdict').value,mastery:$('mastery').value};save()};
  $('finish-form').oninput=e=>{if(e.target.id==='finding')e.target.setCustomValidity('');draft()};$('finish-form').onchange=draft;
  $('finish-form').onsubmit=e=>{e.preventDefault();if(q.status!=='active')return;const evidence=$('finding').value.trim();if(!evidence){$('finding').setCustomValidity('직접 관찰한 내용을 적어 주세요.');$('finding').reportValidity();return;}
-  const before=stats(q.track,q.skill).rank;const eligible=Object.keys(lootDefs).filter(x=>x!=='plant');const unseen=eligible.filter(x=>!state.inventory[x]);const item=(q.title===requests[0][0]||q.title==='사라진 한 프레임')?'lens':choose(unseen.length?unseen:eligible);
+  const before=stats(q.track,q.skill).rank,item=choose(lootPool(state.inventory,q.title));
   Object.assign(q,{finding:evidence,verdict:$('verdict').value,rankBefore:before,rankAfter:Math.max(before,Number($('mastery').value)),loot:item,status:'done',ended:Date.now()});delete q.draft;state.inventory[item]=(state.inventory[item]||0)+1;save();render();reward(q);};
 }
 function itemBox(i){return '<div class="reward">'+sprite(i)+'<div><h3>'+lootDefs[i][0]+'</h3><p>'+lootDefs[i][1]+'</p></div></div>'}
